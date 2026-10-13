@@ -1,6 +1,6 @@
 # Plan
 
-**Now:** friction pass done (21:31) · **Next:** close note (by 21:52) · **Elapsed:** 2:24 (21:31; start 19:07, live by 20:37, end 22:07)
+**Now:** wrap-up, close note drafted (21:33) · **Done:** S1–S6, N0a, N0b, N1, N2, N9, friction pass · **Not done:** N3–N8, open FRICTION.md items · **Elapsed:** 2:26 (21:33; start 19:07, live by 20:37, end 22:07)
 
 User: the reviewer. Stack: Kotlin + Spring Boot, PostgreSQL, React SPA in `web/` (see CLAUDE.md "Frontend"). Tests: `./gradlew test`, `npm test` in `web/` (also run in the Docker build).
 Each slice: tests first for logic → `./deploy.sh` → check on http://localhost:8080 → tick ✓ → commit.
