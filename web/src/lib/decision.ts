@@ -38,3 +38,8 @@ export function attemptFor(input: DecisionInput, last: Attempt | null, newKey: (
     last.input.comment.trim() === input.comment.trim()
   return same ? last : { input, key: newKey() }
 }
+
+/** Where to go after "Save & next": the next free case, or back to the queue when none is left. */
+export function afterSaveLocation(nextCaseId: string | null): string {
+  return nextCaseId ? `/cases/${encodeURIComponent(nextCaseId)}` : '/'
+}

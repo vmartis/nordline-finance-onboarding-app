@@ -12,10 +12,25 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
-import { fetchCase, fetchReasonCodes, ApiError, postDecision, type CaseDetail, type ReasonCode } from '@/lib/api'
+import {
+  fetchCase,
+  fetchReasonCodes,
+  ApiError,
+  postDecision,
+  takeNext,
+  type CaseDetail,
+  type ReasonCode,
+} from '@/lib/api'
 import { flagInfo, scoreBandFor, type FlagSeverity, type ScoreBand } from '@/lib/flags'
 import { useSession } from '@/lib/auth'
-import { attemptFor, DECISIONS, decisionSchema, type Attempt, type DecisionInput } from '@/lib/decision'
+import {
+  afterSaveLocation,
+  attemptFor,
+  DECISIONS,
+  decisionSchema,
+  type Attempt,
+  type DecisionInput,
+} from '@/lib/decision'
 
 export function CaseSheet({ caseId, onClose }: { caseId: string | undefined; onClose: () => void }) {
   return (
@@ -222,13 +237,24 @@ function DecisionForm(props: { caseId: string; onDone: () => void; reviewer: str
     defaultValues: { reviewer: props.reviewer, reasonCode: '', comment: '' },
   })
   const lastAttempt = useRef<Attempt | null>(null)
+  const afterSave = useRef<'next' | 'close'>('next')
+  const navigate = useNavigate()
   const save = useMutation({
     mutationFn: ({ input, key }: Attempt) => postDecision(caseId, input, key),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       toast.success(`${caseId} saved in the back office as ${result.status}.`)
       queryClient.invalidateQueries({ queryKey: ['queue'] })
       queryClient.invalidateQueries({ queryKey: ['case', caseId] })
-      onDone()
+      if (afterSave.current === 'close') return onDone()
+      // "Save & next": take the next most urgent free case right away.
+      try {
+        const next = await takeNext()
+        if (!next) toast.info('No free cases left: every pending case is taken.')
+        navigate(afterSaveLocation(next))
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Could not take the next case.')
+        onDone()
+      }
     },
     onError: (error) => {
       toast.error(error.message)
@@ -277,9 +303,14 @@ function DecisionForm(props: { caseId: string; onDone: () => void; reviewer: str
       <Field label="Comment" id="comment" error={errors.comment?.message}>
         <Textarea id="comment" rows={3} placeholder="Why, in one or two sentences" {...form.register('comment')} />
       </Field>
-      <Button type="submit" className="w-full" disabled={save.isPending}>
-        {save.isPending ? 'Saving…' : 'Save decision'}
-      </Button>
+      <div className="flex gap-2">
+        <Button type="submit" className="flex-1" disabled={save.isPending} onClick={() => (afterSave.current = 'next')}>
+          {save.isPending ? 'Saving…' : 'Save & next'}
+        </Button>
+        <Button type="submit" variant="outline" disabled={save.isPending} onClick={() => (afterSave.current = 'close')}>
+          Save & close
+        </Button>
+      </div>
     </form>
   )
 }

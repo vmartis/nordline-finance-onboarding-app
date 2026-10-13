@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { attemptFor, decisionSchema, errorMessage, type DecisionInput } from './decision'
+import { afterSaveLocation, attemptFor, decisionSchema, errorMessage, type DecisionInput } from './decision'
 
 const valid = { reviewer: 'j.sebo', decision: 'APPROVE', reasonCode: 'VERIFIED_MANUAL', comment: 'Face matches' }
 
@@ -45,5 +45,15 @@ describe('attemptFor', () => {
     const first = attemptFor(valid as DecisionInput, null, newKey)
     const changed = attemptFor({ ...valid, reasonCode: 'FACE_MISMATCH' } as DecisionInput, first, newKey)
     expect(changed.key).not.toBe(first.key)
+  })
+})
+
+describe('afterSaveLocation', () => {
+  it('opens the next free case after "Save & next"', () => {
+    expect(afterSaveLocation('VC-20261014-0099')).toBe('/cases/VC-20261014-0099')
+  })
+
+  it('goes back to the queue when no free case is left', () => {
+    expect(afterSaveLocation(null)).toBe('/')
   })
 })
