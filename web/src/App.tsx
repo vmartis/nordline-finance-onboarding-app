@@ -8,6 +8,7 @@ export default function App() {
     <AppShell>
       <Routes>
         <Route path="/" element={<QueuePage />} />
+        <Route path="/cases/:caseId" element={<QueuePage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AppShell>

@@ -11,7 +11,10 @@ import java.time.Instant
 import java.time.ZoneOffset
 
 @ConfigurationProperties("app")
-data class AppProperties(val ingest: Ingest, val clock: ClockSettings) {
+data class AppProperties(val ingest: Ingest, val clock: ClockSettings, val caseApi: CaseApi, val referenceDir: String) {
+    /** The legacy back-office Case API. The key never leaves the server. */
+    data class CaseApi(val url: String, val key: String)
+
     /** Empty key = ingest refuses every call. */
     data class Ingest(val apiKey: String = "")
 

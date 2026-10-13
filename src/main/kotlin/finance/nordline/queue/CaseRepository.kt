@@ -52,6 +52,40 @@ class CaseRepository(private val jdbc: JdbcClient) {
     private fun parseDate(raw: String?): LocalDate? =
         try { raw?.let(LocalDate::parse) } catch (_: DateTimeParseException) { null }
 
+    fun findDetail(caseId: String): CaseDetail? =
+        jdbc.sql(
+            """
+            select case_id, status, created_at, sla_hours, full_name, document_type, document_number, date_of_birth,
+                   attempt, flags, score_document, score_face, score_liveness, notes
+            from verification_case where case_id = :caseId
+            """,
+        ).param("caseId", caseId).query { rs, _ ->
+            @Suppress("UNCHECKED_CAST")
+            CaseDetail(
+                caseId = rs.getString("case_id"),
+                status = rs.getString("status"),
+                createdAt = rs.getTimestamp("created_at")?.toInstant(),
+                slaHours = rs.getInt("sla_hours"),
+                fullName = rs.getString("full_name"),
+                documentType = rs.getString("document_type"),
+                documentNumber = rs.getString("document_number"),
+                dateOfBirth = rs.getObject("date_of_birth", LocalDate::class.java),
+                attempt = rs.getInt("attempt"),
+                flags = (rs.getArray("flags").array as Array<String>).toList(),
+                scores = Scores(
+                    documentAuthenticity = rs.getBigDecimal("score_document")?.toDouble(),
+                    faceMatch = rs.getBigDecimal("score_face")?.toDouble(),
+                    liveness = rs.getBigDecimal("score_liveness")?.toDouble(),
+                ),
+                notes = rs.getString("notes"),
+            )
+        }.optional().orElse(null)
+
+    fun setStatus(caseId: String, status: String) {
+        jdbc.sql("update verification_case set status = :status, updated_at = now() where case_id = :caseId")
+            .param("status", status).param("caseId", caseId).update()
+    }
+
     fun findPending(): List<PendingCase> =
         jdbc.sql(
             """

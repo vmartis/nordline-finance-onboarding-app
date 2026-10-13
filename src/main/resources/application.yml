@@ -3,6 +3,10 @@
 spring:
   application:
     name: morning-queue
+  mvc:
+    # Errors as RFC 9457 problem details; our own messages are written for the reviewer and hold no personal data.
+    problemdetails:
+      enabled: true
 server:
   port: 8080
   error:
@@ -13,6 +17,10 @@ app:
     api-key: ${INGEST_API_KEY:}
   clock:
     now: ${APP_NOW:2026-10-14T08:00:00Z}
+  case-api:
+    url: ${CASE_API_URL:http://case-api:9000}
+    key: ${CASE_API_KEY:}
+  reference-dir: ${REFERENCE_DIR:/reference}
 logging:
   level:
     # Its warnings quote rejected request values, which can be personal data. Clients still get the 400.

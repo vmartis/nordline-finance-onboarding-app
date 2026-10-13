@@ -1,7 +1,17 @@
 # Environment services. Add your own app service(s) below "# --- your services ---".
 services:
+  # One-off step: the Case API runs as "nobody" but its state volume belongs to root, so saving a decision crashed it.
+  case-api-state-init:
+    image: python:3.12-slim
+    user: root
+    command: ["chown", "65534:65534", "/state"]
+    volumes:
+      - case-api-state:/state
   case-api:
     build: ./services/case-api
+    depends_on:
+      case-api-state-init:
+        condition: service_completed_successfully
     environment:
       CASE_API_KEY: ${CASE_API_KEY:-local-dev-key-change-me}
       DATA_DIR: /data
@@ -38,6 +48,13 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-local-dev-db-password-change-me}
       INGEST_API_KEY: ${INGEST_API_KEY:-local-dev-ingest-key-change-me}
       APP_NOW: ${APP_NOW:-2026-10-14T08:00:00Z}
+      CASE_API_URL: http://case-api:9000
+      CASE_API_KEY: ${CASE_API_KEY:-local-dev-key-change-me}
+      REFERENCE_DIR: /reference
+    # Only the two reference files; the customer export (cases.json) stays out of this container.
+    volumes:
+      - ./data/reviewers.json:/reference/reviewers.json:ro
+      - ./data/reason_codes.json:/reference/reason_codes.json:ro
     depends_on:
       db:
         condition: service_healthy

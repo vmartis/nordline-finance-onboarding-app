@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { CircleAlert, Inbox } from 'lucide-react'
 import { useEffect } from 'react'
+import { useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
+import { CaseSheet } from '@/components/case-sheet'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,13 +14,17 @@ import { timeLeft } from '@/lib/time-left'
 
 export function QueuePage() {
   const queue = useQuery({ queryKey: ['queue'], queryFn: fetchQueue })
+  const { caseId } = useParams()
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (queue.isError) toast.error('Could not load the queue.')
   }, [queue.isError])
 
   return (
-    <Card>
+    <>
+      <CaseSheet caseId={caseId} onClose={() => navigate('/')} />
+      <Card>
       <CardHeader>
         <CardTitle>Pending cases</CardTitle>
         <CardDescription>
@@ -42,13 +48,16 @@ export function QueuePage() {
             text="Nothing is waiting for review. New cases appear after the next import."
           />
         )}
-        {queue.data && queue.data.length > 0 && <QueueTable items={queue.data} />}
+        {queue.data && queue.data.length > 0 && (
+          <QueueTable items={queue.data} onOpen={(id) => navigate(`/cases/${encodeURIComponent(id)}`)} />
+        )}
       </CardContent>
     </Card>
+    </>
   )
 }
 
-function QueueTable({ items }: { items: QueueItem[] }) {
+function QueueTable({ items, onOpen }: { items: QueueItem[]; onOpen: (caseId: string) => void }) {
   return (
     <Table>
       <TableHeader>
@@ -62,11 +71,22 @@ function QueueTable({ items }: { items: QueueItem[] }) {
       </TableHeader>
       <TableBody>
         {items.map((item) => (
-          <TableRow key={item.caseId}>
+          <TableRow key={item.caseId} className="cursor-pointer" onClick={() => onOpen(item.caseId)}>
             <TableCell>
               <TimeLeftBadge minutes={item.minutesLeft} />
             </TableCell>
-            <TableCell className="font-mono text-xs">{item.caseId}</TableCell>
+            <TableCell className="font-mono text-xs">
+              <button
+                type="button"
+                className="underline-offset-4 hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpen(item.caseId)
+                }}
+              >
+                {item.caseId}
+              </button>
+            </TableCell>
             <TableCell>{item.documentType ?? '—'}</TableCell>
             <TableCell>
               <div className="flex flex-wrap gap-1">

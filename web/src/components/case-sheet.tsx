@@ -1,0 +1,204 @@
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { CircleAlert } from 'lucide-react'
+import { useForm } from 'react-hook-form'
+import { toast } from 'sonner'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  fetchCase,
+  fetchReasonCodes,
+  fetchReviewers,
+  postDecision,
+  type CaseDetail,
+  type ReasonCode,
+  type Reviewer,
+} from '@/lib/api'
+import { DECISIONS, decisionSchema, rememberedReviewer, type DecisionInput } from '@/lib/decision'
+
+const LAST_REVIEWER = 'morning-queue.reviewer'
+
+function lastReviewer(): string | null {
+  try {
+    return localStorage.getItem(LAST_REVIEWER)
+  } catch {
+    return null
+  }
+}
+
+export function CaseSheet({ caseId, onClose }: { caseId: string | undefined; onClose: () => void }) {
+  return (
+    <Sheet open={caseId !== undefined} onOpenChange={(open) => !open && onClose()}>
+      <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
+        {caseId && <CaseSheetBody key={caseId} caseId={caseId} onClose={onClose} />}
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+function CaseSheetBody({ caseId, onClose }: { caseId: string; onClose: () => void }) {
+  const detail = useQuery({ queryKey: ['case', caseId], queryFn: () => fetchCase(caseId) })
+
+  return (
+    <>
+      <SheetHeader>
+        <SheetTitle className="font-mono">{caseId}</SheetTitle>
+        <SheetDescription>
+          {detail.data ? <Badge variant="secondary">{detail.data.status}</Badge> : 'Loading case…'}
+        </SheetDescription>
+      </SheetHeader>
+      <div className="space-y-6 px-4 pb-6">
+        {detail.isPending && <Skeleton className="h-48 w-full" />}
+        {detail.isError && (
+          <p className="flex items-center gap-2 text-sm text-destructive">
+            <CircleAlert className="size-4" aria-hidden /> {detail.error.message}
+          </p>
+        )}
+        {detail.data && <CaseFacts detail={detail.data} />}
+        {detail.data?.status === 'PENDING_REVIEW' && <DecisionSection caseId={caseId} onDone={onClose} />}
+      </div>
+    </>
+  )
+}
+
+function CaseFacts({ detail }: { detail: CaseDetail }) {
+  const score = (value: number | null) => (value === null ? 'missing' : value.toFixed(2))
+  return (
+    <div className="space-y-4 text-sm">
+      <section>
+        <h3 className="mb-2 font-medium">Checks</h3>
+        <dl className="grid grid-cols-3 gap-2">
+          <Fact label="Document" value={score(detail.scores.documentAuthenticity)} />
+          <Fact label="Face match" value={score(detail.scores.faceMatch)} />
+          <Fact label="Liveness" value={score(detail.scores.liveness)} />
+        </dl>
+        <div className="mt-2 flex flex-wrap gap-1">
+          {detail.flags.map((flag) => (
+            <Badge key={flag} variant="outline">
+              {flag}
+            </Badge>
+          ))}
+        </div>
+      </section>
+      <section>
+        <h3 className="mb-2 font-medium">Applicant</h3>
+        <dl className="grid grid-cols-2 gap-2">
+          <Fact label="Name" value={detail.fullName ?? '—'} />
+          <Fact label="Date of birth" value={detail.dateOfBirth ?? 'unknown'} />
+          <Fact label="Document" value={detail.documentType ?? '—'} />
+          <Fact label="Document number" value={detail.documentNumber ?? '—'} />
+          <Fact label="Attempt" value={String(detail.attempt)} />
+        </dl>
+        {detail.notes && <p className="mt-2 text-muted-foreground">{detail.notes}</p>}
+      </section>
+    </div>
+  )
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border bg-muted/40 p-2">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="font-medium">{value}</dd>
+    </div>
+  )
+}
+
+/** The form appears only when reviewers and reason codes are loaded, so every default matches a visible option. */
+function DecisionSection({ caseId, onDone }: { caseId: string; onDone: () => void }) {
+  const reviewers = useQuery({ queryKey: ['reviewers'], queryFn: fetchReviewers, staleTime: Infinity })
+  const reasonCodes = useQuery({ queryKey: ['reason-codes'], queryFn: fetchReasonCodes, staleTime: Infinity })
+
+  if (reviewers.isError || reasonCodes.isError) {
+    return (
+      <p className="flex items-center gap-2 border-t pt-4 text-sm text-destructive">
+        <CircleAlert className="size-4" aria-hidden /> Could not load reviewers or reason codes. Close and open the
+        case again.
+      </p>
+    )
+  }
+  if (!reviewers.data || !reasonCodes.data) return <Skeleton className="h-64 w-full" />
+  return <DecisionForm caseId={caseId} onDone={onDone} reviewers={reviewers.data} reasonCodes={reasonCodes.data} />
+}
+
+function DecisionForm(props: { caseId: string; onDone: () => void; reviewers: Reviewer[]; reasonCodes: ReasonCode[] }) {
+  const { caseId, onDone } = props
+  const queryClient = useQueryClient()
+  const form = useForm<DecisionInput>({
+    resolver: zodResolver(decisionSchema),
+    defaultValues: { reviewer: rememberedReviewer(lastReviewer(), props.reviewers), reasonCode: '', comment: '' },
+  })
+  const save = useMutation({
+    mutationFn: (input: DecisionInput) => postDecision(caseId, input),
+    onSuccess: (result, input) => {
+      try {
+        localStorage.setItem(LAST_REVIEWER, input.reviewer)
+      } catch {
+        /* remembering the name is only a convenience */
+      }
+      toast.success(`${caseId} saved in the back office as ${result.status}.`)
+      queryClient.invalidateQueries({ queryKey: ['queue'] })
+      queryClient.invalidateQueries({ queryKey: ['case', caseId] })
+      onDone()
+    },
+    onError: (error) => toast.error(error.message),
+  })
+  const errors = form.formState.errors
+
+  return (
+    <form onSubmit={form.handleSubmit((input) => save.mutate(input))} className="space-y-4 border-t pt-4" noValidate>
+      <h3 className="font-medium">Decision</h3>
+      <Field label="Your name" id="reviewer" error={errors.reviewer?.message}>
+        <NativeSelect id="reviewer" className="w-full" {...form.register('reviewer')}>
+          <NativeSelectOption value="">Pick your name</NativeSelectOption>
+          {props.reviewers.map((r) => (
+            <NativeSelectOption key={r.id} value={r.id}>
+              {r.id} (shift {r.shift})
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+      </Field>
+      <Field label="Decision" id="decision" error={errors.decision?.message}>
+        <NativeSelect id="decision" className="w-full" defaultValue="" {...form.register('decision')}>
+          <NativeSelectOption value="">Pick a decision</NativeSelectOption>
+          {DECISIONS.map((d) => (
+            <NativeSelectOption key={d.value} value={d.value}>
+              {d.label}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+      </Field>
+      <Field label="Reason code" id="reasonCode" error={errors.reasonCode?.message}>
+        <NativeSelect id="reasonCode" className="w-full" {...form.register('reasonCode')}>
+          <NativeSelectOption value="">Pick a reason code</NativeSelectOption>
+          {props.reasonCodes.map((r) => (
+            <NativeSelectOption key={r.code} value={r.code}>
+              {r.label}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+      </Field>
+      <Field label="Comment" id="comment" error={errors.comment?.message}>
+        <Textarea id="comment" rows={3} placeholder="Why, in one or two sentences" {...form.register('comment')} />
+      </Field>
+      <Button type="submit" className="w-full" disabled={save.isPending}>
+        {save.isPending ? 'Saving…' : 'Save decision'}
+      </Button>
+    </form>
+  )
+}
+
+function Field(props: { label: string; id: string; error?: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={props.id}>{props.label}</Label>
+      {props.children}
+      {props.error && <p className="text-sm text-destructive">{props.error}</p>}
+    </div>
+  )
+}
