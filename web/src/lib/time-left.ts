@@ -8,3 +8,13 @@ export function timeLeft(minutes: number | null): { label: string; status: TimeL
   if (minutes < 0) return { label: `overdue ${text}`, status: 'overdue' }
   return { label: text, status: minutes < 60 ? 'soon' : 'ok' }
 }
+
+export type RowTone = 'danger' | 'warning' | 'none'
+
+/** Whole-row highlight in the queue: danger under 1 h (or overdue), warning under 2 h. */
+export function rowTone(minutes: number | null): RowTone {
+  if (minutes === null) return 'none'
+  const { status } = timeLeft(minutes) // same 1 h rule as the badges and the backlog strip
+  if (status === 'overdue' || status === 'soon') return 'danger'
+  return minutes < 120 ? 'warning' : 'none'
+}

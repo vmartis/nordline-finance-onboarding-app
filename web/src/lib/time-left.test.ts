@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { timeLeft } from './time-left'
+import { rowTone, timeLeft } from './time-left'
 
 describe('timeLeft', () => {
   it('shows hours and minutes left', () => {
@@ -18,5 +18,23 @@ describe('timeLeft', () => {
     expect(timeLeft(45)).toEqual({ label: '0 h 45 min', status: 'soon' })
     expect(timeLeft(0)).toEqual({ label: '0 h 00 min', status: 'soon' })
     expect(timeLeft(60).status).toBe('ok')
+  })
+})
+
+describe('rowTone', () => {
+  it('is danger when less than 1 h is left or the case is overdue', () => {
+    expect(rowTone(-30)).toBe('danger')
+    expect(rowTone(0)).toBe('danger')
+    expect(rowTone(59)).toBe('danger')
+  })
+
+  it('is warning when less than 2 h is left', () => {
+    expect(rowTone(60)).toBe('warning')
+    expect(rowTone(119)).toBe('warning')
+  })
+
+  it('is plain from 2 h on, and for an unknown deadline (it has its own data-problem badge)', () => {
+    expect(rowTone(120)).toBe('none')
+    expect(rowTone(null)).toBe('none')
   })
 })

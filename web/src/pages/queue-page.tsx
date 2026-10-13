@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { fetchQueue, takeNext, type QueueItem } from '@/lib/api'
 import { backlogSummary } from '@/lib/backlog'
-import { timeLeft } from '@/lib/time-left'
+import { rowTone, timeLeft, type RowTone } from '@/lib/time-left'
 
 export function QueuePage() {
   const queue = useQuery({ queryKey: ['queue'], queryFn: fetchQueue })
@@ -74,6 +74,12 @@ export function QueuePage() {
   )
 }
 
+const ROW_TONE: Record<RowTone, string> = {
+  danger: 'bg-red-50 hover:bg-red-100',
+  warning: 'bg-amber-50 hover:bg-amber-100',
+  none: '',
+}
+
 function QueueTable({ items, onOpen }: { items: QueueItem[]; onOpen: (caseId: string) => void }) {
   return (
     <Table>
@@ -88,7 +94,11 @@ function QueueTable({ items, onOpen }: { items: QueueItem[]; onOpen: (caseId: st
       </TableHeader>
       <TableBody>
         {items.map((item) => (
-          <TableRow key={item.caseId} className="cursor-pointer" onClick={() => onOpen(item.caseId)}>
+          <TableRow
+            key={item.caseId}
+            className={`cursor-pointer ${ROW_TONE[rowTone(item.minutesLeft)]}`}
+            onClick={() => onOpen(item.caseId)}
+          >
             <TableCell>
               <TimeLeftBadge minutes={item.minutesLeft} />
             </TableCell>
