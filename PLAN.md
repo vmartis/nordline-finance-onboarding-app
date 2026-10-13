@@ -26,3 +26,17 @@ After the build: use it myself + FRICTION.md fixes (~25 min) → `reviewer` and 
 - Login and permissions (reviewer picks their name).
 - Replacing the back office; editing case data; images.
 - The legacy system calling our ingest API (IT's work).
+
+## If time allows (after MVP)
+| Prio | # | Item (what the user gains) | Why not in MVP | Depends on | Touches (files/areas) | Min | ✓ |
+|---|---|---|---|---|---|---|---|
+| 1 | N1 | **Save & next.** After saving, the next most urgent free case opens by itself: one click less on each of 120–150 cases | MVP works without it; needs claims first | S4, S5 | `web/src/components/case-sheet.tsx`, claim endpoint | 10 | |
+| 2 | N2 | **Backlog strip.** One line above the queue: "3 overdue · 12 due within 1 h · 118 later", so the reviewer sees the pressure at a glance | Queue already sorts by urgency; this is a summary on top | S5 (overdue/<1 h marks) | `web/src/pages/queue-page.tsx` (from `/api/queue`, no backend change) | 10 | |
+| 3 | N3 | **My decisions today.** A list of what I saved and what the back office answered, so I never wonder "did that go through?" | Needs the decision log from S4 | S4 | new `GET /api/decisions?reviewer=`, small sheet/page in `web/` | 15 | |
+| 4 | N4 | **Reason codes that fit the decision.** After "Approve", only approve-type reasons are offered, so new colleagues can't pick a contradicting reason | The mapping is a compliance rule; must be confirmed, shown as guidance | S2b | `web/src/lib/decision.ts`, `case-sheet.tsx` | 10 | |
+| 5 | N5 | **Put a case back.** Release a taken case I can't finish, so it doesn't sit blocked until its SLA runs out | Rare in the first morning; claims come with S5 | S5 | claim endpoint + button in `case-sheet.tsx` | 10 | |
+| 6 | N6 | **Queue stays fresh.** The queue reloads every 60 s and shows "updated 1 min ago", so cases taken by others disappear without F5 | Manual reload works for one reviewer | S5 | `web/src/pages/queue-page.tsx` (TanStack Query refetch interval) | 5 | |
+| 7 | N7 | **Find a case by ID.** Type a case ID a colleague mentions and jump to it | The queue order covers the normal path | S2b | `web/src/pages/queue-page.tsx` | 10 | |
+| 8 | N8 | **Lucia's workload view, minimal** (omitted in note – needs my OK). Open and decided cases per reviewer against their shift | Left out to serve one user well; became cheap once claims and the decision log exist | S4, S5 | new `GET /api/team`, new page in `web/` | 20 | |
+
+An N-item starts only when the whole MVP table is ticked, there are no open fixes in FRICTION.md with higher value, and there are at least (item minutes + 10) minutes left before +2:35.
