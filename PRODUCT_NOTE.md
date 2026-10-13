@@ -22,7 +22,7 @@ Data care: the API key stays on the server. The database holds personal data, so
 
 "Now" is a **simulated clock** (default: 2026-10-14 morning) because the data is dated tomorrow. It can be changed in one setting.
 
-Stack: a small Python backend serving one simple web page, plus a PostgreSQL service, both added to `docker-compose.yml`; the app listens on port 8080 and creates its tables on startup. The import script runs once the app is up and sends the example data through the ingest endpoint.
+Stack: a small Kotlin + Spring Boot backend serving one simple web page, plus a PostgreSQL service, both added to `docker-compose.yml`; the app listens on port 8080 and creates its tables on startup. The import script runs once the app is up and sends the example data through the ingest endpoint.
 
 ## What I will deliberately not build
 - **Automated decisions or auto-approve rules.** The tool helps people decide; it does not decide for them.

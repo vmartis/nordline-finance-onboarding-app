@@ -3,16 +3,16 @@
 Users: **reviewer** (main) and **Lucia**, Head of Onboarding Ops (second). Helpdesk is out of the MVP (see PRODUCT_NOTE.md).
 Start 19:07 · workflow live by **20:37** (+1:30) · close note by **22:07** (+3:00).
 
-Stack: Python 3.12 + FastAPI, psycopg 3, httpx; PostgreSQL 16; one plain HTML/JS page served by the app.
-Tests: pytest inside the app image: `docker compose run --rm app python -m pytest -q`.
+Stack: Kotlin + Spring Boot (Java 21, Gradle wrapper), Spring Data JDBC, Flyway for tables, RestClient for the Case API; PostgreSQL 16; one plain HTML/JS page served by the app as a static file. Docker image built in a multi-stage Dockerfile.
+Tests: JUnit 5 on the host: `./gradlew test` (Postgres via Testcontainers, fake Case API via WireMock).
 Each slice: tests first for the logic, `./deploy.sh`, check on http://localhost:8080, update this file, commit.
 
 ## Slices
 
 | # | Slice | Done when | Target | Status |
 |---|---|---|---|---|
-| 0 | **Skeleton.** `app` + `db` (Postgres) services in docker compose; FastAPI serves an empty page on :8080; tables created on start; secrets from env | `./deploy.sh` passes; `/` answers; Postgres has no published port | 19:45 | todo |
-| 1 | **Ingest.** `POST /api/ingest/cases` (own API key, batch, upsert by case ID) with cleaning: duplicate IDs (first wins), both date formats, missing/invalid scores stored as missing, a "data problem" note per issue; never overwrites a decision unless the push carries one. `scripts/import_example.py` sends `data/cases.json` through it; reason codes and reviewers loaded from JSON | Unit tests for each cleaning rule; import prints accepted/updated/problems; re-run changes nothing | 20:00 | todo |
+| 0 | **Skeleton.** `app` + `db` (Postgres) services in docker compose; Spring Boot serves an empty page on :8080; Flyway creates the tables on start; secrets from env | `./deploy.sh` passes; `/` answers; Postgres has no published port | 19:45 | todo |
+| 1 | **Ingest.** `POST /api/ingest/cases` (own API key, batch, upsert by case ID) with cleaning: duplicate IDs (first wins), both date formats, missing/invalid scores stored as missing, a "data problem" note per issue; never overwrites a decision unless the push carries one. `scripts/import-example.sh` (curl + jq, both on the machine) sends `data/cases.json` through it; reason codes and reviewers loaded from JSON | Unit tests for each cleaning rule; import prints accepted/updated/problems; re-run changes nothing | 20:00 | todo |
 | 2 | **Queue + take next.** Reviewer picks their name. Pending cases sorted by time left to SLA (4 h ID card / 8 h passport), using a simulated clock (default 2026-10-14 08:00 UTC, one setting); overdue and < 1 h marked. "Take next" claims the most urgent unclaimed case atomically (two reviewers can never get the same one) | Tests: SLA math, ordering, data-problem cases still shown, concurrent claim | 20:15 | todo |
 | 3 | **Case view + decision.** Scores shown as good/borderline/bad; each flag explained in plain English with how serious it usually is; earlier attempts by the same document number. Decision form: decision + reason code + comment required. Sent to the Case API with one idempotency key per decision, retried on 503 with the same key; 409 → refresh case and tell the reviewer. Saved to our DB only after the API confirms. Decision log (who, what, reason, when, API result) | Tests with a fake Case API: 503 then OK = one decision; 409 path; 422 path; missing reason rejected. One end-to-end check against the real Case API | **20:37 live** | todo |
 | 4 | **Team view for Lucia.** Pending cases grouped by time left (overdue, < 1 h, < 2 h, later); per reviewer: claimed, decided today, on shift now or not | Tests for grouping and counts; page usable | 21:05 | todo |
