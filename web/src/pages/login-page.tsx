@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { login } from '@/lib/api'
-import { setSession } from '@/lib/auth'
+import { endedBecause, setSession } from '@/lib/auth'
 
 const loginSchema = z.object({
   username: z.string().trim().min(1, 'Enter your name.'),
@@ -34,6 +34,11 @@ export function LoginPage() {
         <CardDescription>Use your reviewer name, for example j.sebo.</CardDescription>
       </CardHeader>
       <CardContent>
+        {endedBecause() === 'expired' && (
+          <p className="mb-4 rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">
+            Your session ended. Log in again to continue.
+          </p>
+        )}
         <form onSubmit={form.handleSubmit((input) => submit.mutate(input))} className="space-y-4" noValidate>
           <div className="space-y-1.5">
             <Label htmlFor="username">Name</Label>

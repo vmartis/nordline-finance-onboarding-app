@@ -1,4 +1,4 @@
-import { authHeader, clearSession, type Session } from './auth'
+import { authHeader, clearSession, getSession, type Session } from './auth'
 import { errorMessage, type DecisionInput } from './decision'
 
 /** One row of GET /api/queue. No name, document number or birth date. */
@@ -39,7 +39,7 @@ export type ReasonCode = { code: string; label: string }
 async function send(url: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(url, { ...init, headers: { ...init?.headers, ...authHeader() } })
   // Token missing or expired: back to the login screen.
-  if (response.status === 401) clearSession()
+  if (response.status === 401 && getSession()) clearSession('expired')
   return response
 }
 

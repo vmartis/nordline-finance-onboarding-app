@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { authHeader, clearSession, getSession, setSession } from './auth'
+import { authHeader, clearSession, endedBecause, getSession, setSession } from './auth'
 
 afterEach(() => clearSession())
 
@@ -26,5 +26,17 @@ describe('session', () => {
     setSession({ token: 'abc', username: 'j.sebo', expiresAt: later })
     clearSession()
     expect(getSession()).toBeNull()
+  })
+
+  it('remembers that a session ended on its own, so the login page can say so, until the next login', () => {
+    setSession({ token: 'abc', username: 'j.sebo', expiresAt: later })
+    clearSession('expired')
+    expect(endedBecause()).toBe('expired')
+
+    setSession({ token: 'def', username: 'j.sebo', expiresAt: later })
+    expect(endedBecause()).toBeNull()
+
+    clearSession()
+    expect(endedBecause()).toBeNull()
   })
 })

@@ -23,6 +23,7 @@ import {
 } from '@/lib/api'
 import { flagInfo, scoreBandFor, type FlagSeverity, type ScoreBand } from '@/lib/flags'
 import { useSession } from '@/lib/auth'
+import { statusLabel } from '@/lib/status'
 import {
   afterSaveLocation,
   attemptFor,
@@ -53,7 +54,7 @@ function CaseSheetBody({ caseId, onClose }: { caseId: string; onClose: () => voi
       <SheetHeader>
         <SheetTitle className="font-mono">{caseId}</SheetTitle>
         <SheetDescription>
-          {detail.data ? <Badge variant="secondary">{detail.data.status}</Badge> : 'Loading case…'}
+          {detail.data ? <Badge variant="secondary">{statusLabel(detail.data.status)}</Badge> : 'Loading case…'}
         </SheetDescription>
       </SheetHeader>
       <div className="space-y-6 px-4 pb-6">
@@ -165,7 +166,9 @@ function CaseFacts({ detail }: { detail: CaseDetail }) {
                       Attempt {a.attempt} ({a.attempt < detail.attempt ? 'earlier' : 'later'}) ·{' '}
                       <span className="font-mono text-xs">{a.caseId}</span>
                     </span>
-                    <Badge variant={a.status === 'PENDING_REVIEW' ? 'secondary' : 'outline'}>{a.status}</Badge>
+                    <Badge variant={a.status === 'PENDING_REVIEW' ? 'secondary' : 'outline'}>
+                      {statusLabel(a.status)}
+                    </Badge>
                   </span>
                   {a.flags.length > 0 && (
                     <span className="mt-1 block text-xs text-muted-foreground">
@@ -242,7 +245,7 @@ function DecisionForm(props: { caseId: string; onDone: () => void; reviewer: str
   const save = useMutation({
     mutationFn: ({ input, key }: Attempt) => postDecision(caseId, input, key),
     onSuccess: async (result) => {
-      toast.success(`${caseId} saved in the back office as ${result.status}.`)
+      toast.success(`${caseId} saved in the back office as "${statusLabel(result.status)}".`)
       queryClient.invalidateQueries({ queryKey: ['queue'] })
       queryClient.invalidateQueries({ queryKey: ['case', caseId] })
       if (afterSave.current === 'close') return onDone()
