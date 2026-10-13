@@ -101,6 +101,27 @@ class CaseRepository(private val jdbc: JdbcClient) {
             )
         }.optional().orElse(null)
 
+    fun findOtherAttempts(caseId: String): List<OtherAttempt> =
+        jdbc.sql(
+            """
+            select o.case_id, o.attempt, o.status, o.created_at, o.flags
+            from verification_case me
+            join verification_case o on o.document_number = me.document_number and o.case_id <> me.case_id
+            where me.case_id = :caseId
+              and me.document_number ~ '[0-9]' -- a real number; placeholders like "UNKNOWN" or blanks must not link strangers
+            order by o.attempt, o.created_at, o.case_id
+            """,
+        ).param("caseId", caseId).query { rs, _ ->
+            @Suppress("UNCHECKED_CAST")
+            OtherAttempt(
+                caseId = rs.getString("case_id"),
+                attempt = rs.getInt("attempt"),
+                status = rs.getString("status"),
+                createdAt = rs.getTimestamp("created_at")?.toInstant(),
+                flags = (rs.getArray("flags").array as Array<String>).toList(),
+            )
+        }.list()
+
     fun setStatus(caseId: String, status: String) {
         jdbc.sql("update verification_case set status = :status, updated_at = now() where case_id = :caseId")
             .param("status", status).param("caseId", caseId).update()

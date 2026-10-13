@@ -38,7 +38,12 @@ data class CaseDetail(
     val scores: Scores,
     val notes: String?,
     val dataProblems: List<String>,
+    /** Other cases with the same document number (earlier and later attempts), in attempt order. */
+    val otherAttempts: List<OtherAttempt> = emptyList(),
 )
+
+/** Another attempt by the same applicant. No personal data: the document number is only used to find it. */
+data class OtherAttempt(val caseId: String, val attempt: Int, val status: String, val createdAt: Instant?, val flags: List<String>)
 
 enum class Decision { APPROVE, REJECT, REQUEST_RECAPTURE, ESCALATE }
 
@@ -71,7 +76,8 @@ class CaseController(
     @GetMapping("/{caseId}")
     fun case(@PathVariable @Pattern(regexp = CASE_ID) caseId: String): ResponseEntity<CaseDetail> {
         val detail = cases.findDetail(caseId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Case not found.")
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(detail)
+        val withAttempts = detail.copy(otherAttempts = cases.findOtherAttempts(caseId))
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(withAttempts)
     }
 
     /**

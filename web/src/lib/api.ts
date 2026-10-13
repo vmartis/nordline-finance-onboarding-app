@@ -29,6 +29,8 @@ export type CaseDetail = {
   scores: { documentAuthenticity: number | null; faceMatch: number | null; liveness: number | null }
   notes: string | null
   dataProblems: string[]
+  /** Other cases with the same document number, in attempt order. */
+  otherAttempts: { caseId: string; attempt: number; status: string; createdAt: string | null; flags: string[] }[]
 }
 
 export type Reviewer = { id: string; team: string; shift: string }

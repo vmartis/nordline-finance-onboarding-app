@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CircleAlert, TriangleAlert } from 'lucide-react'
 import { useRef } from 'react'
+import { useNavigate } from 'react-router'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -21,8 +22,16 @@ import {
   type ReasonCode,
   type Reviewer,
 } from '@/lib/api'
+import { flagInfo, scoreBandFor, type FlagSeverity, type ScoreBand } from '@/lib/flags'
 import { loadReviewer, saveReviewer } from '@/lib/reviewer'
-import { attemptFor, DECISIONS, decisionSchema, rememberedReviewer, type Attempt, type DecisionInput } from '@/lib/decision'
+import {
+  attemptFor,
+  DECISIONS,
+  decisionSchema,
+  rememberedReviewer,
+  type Attempt,
+  type DecisionInput,
+} from '@/lib/decision'
 
 export function CaseSheet({ caseId, onClose }: { caseId: string | undefined; onClose: () => void }) {
   return (
@@ -35,7 +44,10 @@ export function CaseSheet({ caseId, onClose }: { caseId: string | undefined; onC
 }
 
 function CaseSheetBody({ caseId, onClose }: { caseId: string; onClose: () => void }) {
-  const detail = useQuery({ queryKey: ['case', caseId], queryFn: () => fetchCase(caseId) })
+  const detail = useQuery({
+    queryKey: ['case', caseId],
+    queryFn: () => fetchCase(caseId),
+  })
 
   return (
     <>
@@ -59,8 +71,24 @@ function CaseSheetBody({ caseId, onClose }: { caseId: string; onClose: () => voi
   )
 }
 
+const BAND_STYLE: Record<ScoreBand, string> = {
+  good: 'border-emerald-300 bg-emerald-50 text-emerald-800',
+  borderline: 'border-amber-300 bg-amber-50 text-amber-800',
+  bad: 'border-red-300 bg-red-50 text-red-800',
+  missing: 'border-dashed text-muted-foreground',
+  flagged: 'border-amber-300 bg-amber-50 text-amber-800',
+}
+
+const SEVERITY_TEXT: Record<FlagSeverity, string> = { serious: 'serious', check: 'needs a check', minor: 'minor' }
+
+const SEVERITY_STYLE: Record<FlagSeverity, string> = {
+  serious: 'border-red-300 text-red-700',
+  check: 'border-amber-300 text-amber-700',
+  minor: 'text-muted-foreground',
+}
+
 function CaseFacts({ detail }: { detail: CaseDetail }) {
-  const score = (value: number | null) => (value === null ? 'missing' : value.toFixed(2))
+  const navigate = useNavigate()
   return (
     <div className="space-y-4 text-sm">
       {detail.dataProblems.length > 0 && (
@@ -78,18 +106,79 @@ function CaseFacts({ detail }: { detail: CaseDetail }) {
       <section>
         <h3 className="mb-2 font-medium">Checks</h3>
         <dl className="grid grid-cols-3 gap-2">
-          <Fact label="Document" value={score(detail.scores.documentAuthenticity)} />
-          <Fact label="Face match" value={score(detail.scores.faceMatch)} />
-          <Fact label="Liveness" value={score(detail.scores.liveness)} />
+          <Score
+            label="Document"
+            band={scoreBandFor('documentAuthenticity', detail.scores.documentAuthenticity, detail.flags)}
+            value={detail.scores.documentAuthenticity}
+          />
+          <Score
+            label="Face match"
+            band={scoreBandFor('faceMatch', detail.scores.faceMatch, detail.flags)}
+            value={detail.scores.faceMatch}
+          />
+          <Score
+            label="Liveness"
+            band={scoreBandFor('liveness', detail.scores.liveness, detail.flags)}
+            value={detail.scores.liveness}
+          />
         </dl>
-        <div className="mt-2 flex flex-wrap gap-1">
-          {detail.flags.map((flag) => (
-            <Badge key={flag} variant="outline">
-              {flag}
-            </Badge>
-          ))}
-        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Bands: good ≥ 0.80, borderline ≥ 0.60; a flagged check is never shown as good. Guidance, not policy.
+        </p>
       </section>
+      {detail.flags.length > 0 && (
+        <section>
+          <h3 className="mb-2 font-medium">Flags</h3>
+          <ul className="space-y-2">
+            {detail.flags.map((flag) => {
+              const info = flagInfo(flag)
+              return (
+                <li key={flag} className="rounded-md border p-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{info.label}</span>
+                    <Badge variant="outline" className={SEVERITY_STYLE[info.severity]}>
+                      usually: {SEVERITY_TEXT[info.severity]}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-muted-foreground">{info.text}</p>
+                </li>
+              )
+            })}
+          </ul>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Flag help is guidance for reviewers, not compliance policy.
+          </p>
+        </section>
+      )}
+      {detail.otherAttempts.length > 0 && (
+        <section>
+          <h3 className="mb-2 font-medium">Other attempts with the same document</h3>
+          <ul className="divide-y rounded-md border">
+            {detail.otherAttempts.map((a) => (
+              <li key={a.caseId}>
+                <button
+                  type="button"
+                  className="w-full p-2 text-left hover:bg-muted/60"
+                  onClick={() => navigate(`/cases/${encodeURIComponent(a.caseId)}`)}
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span>
+                      Attempt {a.attempt} ({a.attempt < detail.attempt ? 'earlier' : 'later'}) ·{' '}
+                      <span className="font-mono text-xs">{a.caseId}</span>
+                    </span>
+                    <Badge variant={a.status === 'PENDING_REVIEW' ? 'secondary' : 'outline'}>{a.status}</Badge>
+                  </span>
+                  {a.flags.length > 0 && (
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      {a.flags.map((f) => flagInfo(f).label).join(' · ')}
+                    </span>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <section>
         <h3 className="mb-2 font-medium">Applicant</h3>
         <dl className="grid grid-cols-2 gap-2">
@@ -105,6 +194,16 @@ function CaseFacts({ detail }: { detail: CaseDetail }) {
   )
 }
 
+function Score({ label, value, band }: { label: string; value: number | null; band: ScoreBand }) {
+  const text = band === 'flagged' ? 'flagged by the check' : band
+  return (
+    <div className={`rounded-md border p-2 ${BAND_STYLE[band]}`}>
+      <dt className="text-xs">{label}</dt>
+      <dd className="font-medium">{value === null ? 'missing' : `${value.toFixed(3)} · ${text}`}</dd>
+    </div>
+  )
+}
+
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border bg-muted/40 p-2">
@@ -116,14 +215,22 @@ function Fact({ label, value }: { label: string; value: string }) {
 
 /** The form appears only when reviewers and reason codes are loaded, so every default matches a visible option. */
 function DecisionSection({ caseId, onDone }: { caseId: string; onDone: () => void }) {
-  const reviewers = useQuery({ queryKey: ['reviewers'], queryFn: fetchReviewers, staleTime: Infinity })
-  const reasonCodes = useQuery({ queryKey: ['reason-codes'], queryFn: fetchReasonCodes, staleTime: Infinity })
+  const reviewers = useQuery({
+    queryKey: ['reviewers'],
+    queryFn: fetchReviewers,
+    staleTime: Infinity,
+  })
+  const reasonCodes = useQuery({
+    queryKey: ['reason-codes'],
+    queryFn: fetchReasonCodes,
+    staleTime: Infinity,
+  })
 
   if (reviewers.isError || reasonCodes.isError) {
     return (
       <p className="flex items-center gap-2 border-t pt-4 text-sm text-destructive">
-        <CircleAlert className="size-4" aria-hidden /> Could not load reviewers or reason codes. Close and open the
-        case again.
+        <CircleAlert className="size-4" aria-hidden /> Could not load reviewers or reason codes. Close and open the case
+        again.
       </p>
     )
   }
@@ -136,7 +243,11 @@ function DecisionForm(props: { caseId: string; onDone: () => void; reviewers: Re
   const queryClient = useQueryClient()
   const form = useForm<DecisionInput>({
     resolver: zodResolver(decisionSchema),
-    defaultValues: { reviewer: rememberedReviewer(loadReviewer(), props.reviewers), reasonCode: '', comment: '' },
+    defaultValues: {
+      reviewer: rememberedReviewer(loadReviewer(), props.reviewers),
+      reasonCode: '',
+      comment: '',
+    },
   })
   const lastAttempt = useRef<Attempt | null>(null)
   const save = useMutation({
@@ -160,10 +271,14 @@ function DecisionForm(props: { caseId: string; onDone: () => void; reviewers: Re
   const errors = form.formState.errors
 
   return (
-    <form onSubmit={form.handleSubmit((input) => {
+    <form
+      onSubmit={form.handleSubmit((input) => {
         lastAttempt.current = attemptFor(input, lastAttempt.current, () => crypto.randomUUID())
         save.mutate(lastAttempt.current)
-      })} className="space-y-4 border-t pt-4" noValidate>
+      })}
+      className="space-y-4 border-t pt-4"
+      noValidate
+    >
       <h3 className="font-medium">Decision</h3>
       <Field label="Your name" id="reviewer" error={errors.reviewer?.message}>
         <NativeSelect id="reviewer" className="w-full" {...form.register('reviewer')}>

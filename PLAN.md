@@ -1,6 +1,6 @@
 # Plan
 
-**Now:** S5 done (20:54) · **Next:** S6 readable case · **Elapsed:** 1:47 (20:54; start 19:07, live by 20:37, end 22:07)
+**Now:** S6 done, MVP built (21:02) · **Next:** use it myself + FRICTION.md · **Elapsed:** 1:55 (21:02; start 19:07, live by 20:37, end 22:07)
 
 User: the reviewer. Stack: Kotlin + Spring Boot, PostgreSQL, React SPA in `web/` (see CLAUDE.md "Frontend"). Tests: `./gradlew test`, `npm test` in `web/` (also run in the Docker build).
 Each slice: tests first for logic → `./deploy.sh` → check on http://localhost:8080 → tick ✓ → commit.
@@ -13,7 +13,7 @@ Each slice: tests first for logic → `./deploy.sh` → check on http://localhos
 | S3 | **Trustworthy data.** Bad export records are visible as "data problem", not silently wrong | Tests per rule: duplicate ID (first wins), `14.10.2026` dates, missing/invalid scores; import prints accepted/updated/problems; re-run changes nothing | 15 | ✓ |
 | S4 | **Safe decision.** Saving never creates two decisions and never loses one; every decision has a reason | Tests with fake Case API: 503 then OK = one decision (same idempotency key); 409 → case refreshed + message; 422 shown; empty reason/comment rejected; decision log row only after API confirms | 20 | ✓ |
 | S5 | **Take next.** Pick your name, press "Take next", get the most urgent case nobody else has; overdue and < 1 h marked | Test: two parallel claims never get the same case; simulated clock setting changes "time left" | 15 | ✓ |
-| S6 | **Readable case.** Understand a case at a glance: scores, flags explained, earlier attempts by the same document | Each of the 8 flags has a plain-English text (marked as guidance, not policy); earlier attempts shown for a REPEAT_ATTEMPT case | 10 | |
+| S6 | **Readable case.** Understand a case at a glance: scores, flags explained, earlier attempts by the same document | Each of the 8 flags has a plain-English text (marked as guidance, not policy); earlier attempts shown for a REPEAT_ATTEMPT case | 10 | ✓ |
 
 Total 100 min → build done ~21:16. Main workflow live after S2 (~20:16), safe after S4 (~20:51).
 After the build: use it myself + FRICTION.md fixes (~25 min) → `reviewer` and `security-reviewer` agents (~10 min) → `/wrap-up` (15 min).
