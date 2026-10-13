@@ -48,4 +48,28 @@ class QueueOrderTest {
 
         assertThat(queue.map { it.caseId }).containsExactly("A", "B")
     }
+
+    @Test
+    fun `a case 30 seconds past its deadline counts as overdue`() {
+        val queue = order(listOf(case("late", "2026-10-14T04:00:00Z", 4)), now.plusSeconds(30))
+
+        assertThat(queue.single().minutesLeft).isEqualTo(-1L)
+    }
+
+    @Test
+    fun `the simulated clock setting changes time left`() {
+        fun minutesLeftAt(setting: String): Long? {
+            val props = AppProperties(
+                ingest = AppProperties.Ingest(),
+                clock = AppProperties.ClockSettings(Instant.parse(setting)),
+                caseApi = AppProperties.CaseApi("http://unused", ""),
+                referenceDir = "data",
+            )
+            val clock = AppConfig(props).clock()
+            return order(listOf(case("c", "2026-10-14T07:00:00Z", 4)), clock.instant()).single().minutesLeft
+        }
+
+        assertThat(minutesLeftAt("2026-10-14T08:00:00Z")).isEqualTo(180L)
+        assertThat(minutesLeftAt("2026-10-14T10:30:00Z")).isEqualTo(30L)
+    }
 }

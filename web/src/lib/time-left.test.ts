@@ -13,4 +13,10 @@ describe('timeLeft', () => {
   it('shows an unknown deadline as a data problem, not as zero', () => {
     expect(timeLeft(null)).toEqual({ label: 'unknown (data problem)', status: 'unknown' })
   })
+
+  it('marks a case due within the hour as soon', () => {
+    expect(timeLeft(45)).toEqual({ label: '0 h 45 min', status: 'soon' })
+    expect(timeLeft(0)).toEqual({ label: '0 h 00 min', status: 'soon' })
+    expect(timeLeft(60).status).toBe('ok')
+  })
 })

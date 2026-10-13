@@ -22,6 +22,8 @@ class IngestAndQueueTest {
 
     @BeforeEach
     fun clean() {
+        jdbc.update("delete from claim")
+        jdbc.update("delete from decision_log")
         jdbc.update("delete from verification_case")
     }
 

@@ -1,21 +1,36 @@
-import { useQuery } from '@tanstack/react-query'
-import { CircleAlert, Inbox } from 'lucide-react'
-import { useEffect } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { CircleAlert, Inbox, Play } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { CaseSheet } from '@/components/case-sheet'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { fetchQueue, type QueueItem } from '@/lib/api'
+import { fetchQueue, fetchReviewers, takeNext, type QueueItem } from '@/lib/api'
+import { loadReviewer, saveReviewer } from '@/lib/reviewer'
 import { timeLeft } from '@/lib/time-left'
 
 export function QueuePage() {
   const queue = useQuery({ queryKey: ['queue'], queryFn: fetchQueue })
   const { caseId } = useParams()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const reviewers = useQuery({ queryKey: ['reviewers'], queryFn: fetchReviewers, staleTime: Infinity })
+  const [reviewer, setReviewer] = useState(() => loadReviewer() ?? '')
+  const knownReviewer = reviewers.data?.some((r) => r.id === reviewer) ? reviewer : ''
+  const next = useMutation({
+    mutationFn: () => takeNext(knownReviewer),
+    onSuccess: (nextCaseId) => {
+      queryClient.invalidateQueries({ queryKey: ['queue'] })
+      if (nextCaseId) navigate(`/cases/${encodeURIComponent(nextCaseId)}`)
+      else toast.info('No free cases left: every pending case is taken.')
+    },
+    onError: (error) => toast.error(error.message),
+  })
 
   useEffect(() => {
     if (queue.isError) toast.error('Could not load the queue.')
@@ -30,6 +45,26 @@ export function QueuePage() {
         <CardDescription>
           {queue.data ? `${queue.data.length} pending cases, most urgent first` : 'Most urgent first'}
         </CardDescription>
+        <CardAction className="flex items-center gap-2">
+          <NativeSelect
+            aria-label="Your name"
+            value={knownReviewer}
+            onChange={(e) => {
+              setReviewer(e.target.value)
+              saveReviewer(e.target.value)
+            }}
+          >
+            <NativeSelectOption value="">Pick your name</NativeSelectOption>
+            {reviewers.data?.map((r) => (
+              <NativeSelectOption key={r.id} value={r.id}>
+                {r.id}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+          <Button onClick={() => next.mutate()} disabled={!knownReviewer || next.isPending}>
+            <Play aria-hidden /> {next.isPending ? 'Taking…' : 'Take next'}
+          </Button>
+        </CardAction>
       </CardHeader>
       <CardContent>
         {queue.isPending && <LoadingRows />}
@@ -86,6 +121,11 @@ function QueueTable({ items, onOpen }: { items: QueueItem[]; onOpen: (caseId: st
               >
                 {item.caseId}
               </button>
+              {item.claimedBy && (
+                <Badge variant="secondary" className="ml-2">
+                  taken by {item.claimedBy}
+                </Badge>
+              )}
               {item.dataProblems.length > 0 && (
                 <Badge variant="outline" className="ml-2 border-amber-500 text-amber-700" title={item.dataProblems.join('\n')}>
                   data problem
@@ -112,10 +152,16 @@ function QueueTable({ items, onOpen }: { items: QueueItem[]; onOpen: (caseId: st
 
 function TimeLeftBadge({ minutes }: { minutes: number | null }) {
   const { label, status } = timeLeft(minutes)
-  const variant = status === 'overdue' ? 'destructive' : status === 'unknown' ? 'outline' : 'secondary'
+  const variant = status === 'overdue' ? 'destructive' : status === 'ok' ? 'secondary' : 'outline'
+  const tone = {
+    unknown: 'border-amber-500 text-amber-700',
+    soon: 'border-orange-500 bg-orange-50 text-orange-700',
+    overdue: undefined,
+    ok: undefined,
+  }[status]
   return (
-    <Badge variant={variant} className={status === 'unknown' ? 'border-amber-500 text-amber-700' : undefined}>
-      {label}
+    <Badge variant={variant} className={tone}>
+      {status === 'soon' ? `due soon · ${label}` : label}
     </Badge>
   )
 }

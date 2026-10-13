@@ -21,17 +21,8 @@ import {
   type ReasonCode,
   type Reviewer,
 } from '@/lib/api'
+import { loadReviewer, saveReviewer } from '@/lib/reviewer'
 import { attemptFor, DECISIONS, decisionSchema, rememberedReviewer, type Attempt, type DecisionInput } from '@/lib/decision'
-
-const LAST_REVIEWER = 'morning-queue.reviewer'
-
-function lastReviewer(): string | null {
-  try {
-    return localStorage.getItem(LAST_REVIEWER)
-  } catch {
-    return null
-  }
-}
 
 export function CaseSheet({ caseId, onClose }: { caseId: string | undefined; onClose: () => void }) {
   return (
@@ -145,17 +136,13 @@ function DecisionForm(props: { caseId: string; onDone: () => void; reviewers: Re
   const queryClient = useQueryClient()
   const form = useForm<DecisionInput>({
     resolver: zodResolver(decisionSchema),
-    defaultValues: { reviewer: rememberedReviewer(lastReviewer(), props.reviewers), reasonCode: '', comment: '' },
+    defaultValues: { reviewer: rememberedReviewer(loadReviewer(), props.reviewers), reasonCode: '', comment: '' },
   })
   const lastAttempt = useRef<Attempt | null>(null)
   const save = useMutation({
     mutationFn: ({ input, key }: Attempt) => postDecision(caseId, input, key),
     onSuccess: (result, { input }) => {
-      try {
-        localStorage.setItem(LAST_REVIEWER, input.reviewer)
-      } catch {
-        /* remembering the name is only a convenience */
-      }
+      saveReviewer(input.reviewer)
       toast.success(`${caseId} saved in the back office as ${result.status}.`)
       queryClient.invalidateQueries({ queryKey: ['queue'] })
       queryClient.invalidateQueries({ queryKey: ['case', caseId] })

@@ -10,6 +10,8 @@ export type QueueItem = {
   minutesLeft: number | null
   /** Plain-English notes on what was wrong in the export. */
   dataProblems: string[]
+  /** Reviewer who took the case with "Take next". */
+  claimedBy: string | null
 }
 
 /** GET /api/cases/{id}: the opened case, the only place with personal data. */
@@ -62,3 +64,18 @@ export const postDecision = (caseId: string, decision: DecisionInput, idempotenc
     headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
     body: JSON.stringify(decision),
   })
+
+/** The case to work on next, or null when every pending case is taken (204). */
+export async function takeNext(reviewer: string): Promise<string | null> {
+  const response = await fetch('/api/claims/next', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reviewer }),
+  })
+  if (response.status === 204) return null
+  if (!response.ok) {
+    const body = await response.json().catch(() => null)
+    throw new ApiError(errorMessage(body, response.status), response.status)
+  }
+  return ((await response.json()) as { caseId: string }).caseId
+}

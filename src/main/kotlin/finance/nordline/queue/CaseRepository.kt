@@ -109,8 +109,10 @@ class CaseRepository(private val jdbc: JdbcClient) {
     fun findPending(): List<PendingCase> =
         jdbc.sql(
             """
-            select case_id, document_type, flags, attempt, created_at, sla_hours, data_problems
-            from verification_case where status = 'PENDING_REVIEW'
+            select v.case_id, v.document_type, v.flags, v.attempt, v.created_at, v.sla_hours, v.data_problems,
+                   c.reviewer as claimed_by
+            from verification_case v left join claim c on c.case_id = v.case_id
+            where v.status = 'PENDING_REVIEW'
             """,
         ).query { rs, _ ->
             @Suppress("UNCHECKED_CAST")
@@ -122,6 +124,7 @@ class CaseRepository(private val jdbc: JdbcClient) {
                 createdAt = rs.getTimestamp("created_at")?.toInstant(),
                 slaHours = rs.getInt("sla_hours"),
                 dataProblems = (rs.getArray("data_problems").array as Array<String>).toList(),
+                claimedBy = rs.getString("claimed_by"),
             )
         }.list()
 }
