@@ -34,6 +34,7 @@ data class CaseDetail(
     val flags: List<String>,
     val scores: Scores,
     val notes: String?,
+    val dataProblems: List<String>,
 )
 
 enum class Decision { APPROVE, REJECT, REQUEST_RECAPTURE, ESCALATE }

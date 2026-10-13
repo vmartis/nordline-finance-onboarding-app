@@ -11,6 +11,7 @@ data class PendingCase(
     val attempt: Int,
     val createdAt: Instant?,
     val slaHours: Int,
+    val dataProblems: List<String> = emptyList(),
 )
 
 data class QueueItem(
@@ -21,6 +22,7 @@ data class QueueItem(
     val deadline: Instant?,
     /** Negative = overdue. Null = deadline unknown (bad creation time in the export). */
     val minutesLeft: Long?,
+    val dataProblems: List<String>,
 )
 
 /** Most urgent first. Unknown deadlines go to the top so nobody overlooks them. */
@@ -34,5 +36,6 @@ fun order(cases: List<PendingCase>, now: Instant): List<QueueItem> =
             attempt = c.attempt,
             deadline = deadline,
             minutesLeft = deadline?.let { Duration.between(now, it).toMinutes() },
+            dataProblems = c.dataProblems,
         )
     }.sortedWith(compareBy<QueueItem, Instant?>(nullsFirst()) { it.deadline }.thenBy { it.caseId })

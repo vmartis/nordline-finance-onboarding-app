@@ -15,8 +15,6 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.servlet.HandlerInterceptor
 import java.security.MessageDigest
-import java.time.Instant
-import java.time.format.DateTimeParseException
 
 /** One case as the legacy system pushes it. Only fields the workflow needs; the rest is ignored. */
 data class IngestCase(
@@ -41,20 +39,21 @@ data class IngestCase(
 
 data class IngestApplicant(
     @field:Size(max = 200) val fullName: String? = null,
-    // Text, not LocalDate: a parse error would quote the raw birth date in the log.
-    @field:Pattern(regexp = "\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])")
-    val dateOfBirth: String? = null,
+    // Text, not LocalDate: a parse error would quote the raw birth date in the log. Checked in clean().
+    @field:Size(max = 40) val dateOfBirth: String? = null,
     @field:Size(max = 40) val documentType: String? = null,
     @field:Size(max = 60) val documentNumber: String? = null,
 )
 
+/** Raw values: the export sometimes has text or out-of-range numbers here. clean() decides what is valid. */
 data class IngestChecks(
-    val documentAuthenticity: Double? = null,
-    val faceMatch: Double? = null,
-    val liveness: Double? = null,
+    val documentAuthenticity: Any? = null,
+    val faceMatch: Any? = null,
+    val liveness: Any? = null,
 )
 
-data class IngestSummary(val accepted: Int, val updated: Int)
+/** accepted = new cases, updated = changed cases, unchanged = same as stored, problems = data-problem notes found. */
+data class IngestSummary(val accepted: Int, val updated: Int, val unchanged: Int, val problems: Int)
 
 @RestController
 @RequestMapping("/api/ingest")
@@ -63,17 +62,15 @@ class IngestController(private val cases: CaseRepository) {
     @PostMapping("/cases")
     @Transactional
     fun ingest(@RequestBody @Size(min = 1, max = 5000) batch: List<@Valid IngestCase>): IngestSummary {
-        var accepted = 0
-        var updated = 0
-        for (c in batch) {
-            if (cases.upsert(c, parseCreatedAt(c.createdAt))) accepted++ else updated++
-        }
-        return IngestSummary(accepted, updated)
+        val cleaned = clean(batch)
+        val results = cleaned.map { cases.upsert(it) }
+        return IngestSummary(
+            accepted = results.count { it == UpsertResult.INSERTED },
+            updated = results.count { it == UpsertResult.UPDATED },
+            unchanged = results.count { it == UpsertResult.UNCHANGED },
+            problems = cleaned.sumOf { it.dataProblems.size },
+        )
     }
-
-    // Unparseable times are stored as unknown; S3 adds the other export formats and a visible data-problem note.
-    private fun parseCreatedAt(raw: String?): Instant? =
-        try { raw?.let(Instant::parse) } catch (_: DateTimeParseException) { null }
 }
 
 /** The legacy system authenticates with its own key in X-Api-Key. Constant-time compare. */

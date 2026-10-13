@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CircleAlert } from 'lucide-react'
+import { CircleAlert, TriangleAlert } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -70,6 +70,18 @@ function CaseFacts({ detail }: { detail: CaseDetail }) {
   const score = (value: number | null) => (value === null ? 'missing' : value.toFixed(2))
   return (
     <div className="space-y-4 text-sm">
+      {detail.dataProblems.length > 0 && (
+        <section className="rounded-md border border-amber-500 bg-amber-50 p-3 text-amber-900">
+          <h3 className="mb-1 flex items-center gap-2 font-medium">
+            <TriangleAlert className="size-4" aria-hidden /> Data problems in the export
+          </h3>
+          <ul className="list-disc space-y-0.5 pl-5">
+            {detail.dataProblems.map((problem) => (
+              <li key={problem}>{problem}</li>
+            ))}
+          </ul>
+        </section>
+      )}
       <section>
         <h3 className="mb-2 font-medium">Checks</h3>
         <dl className="grid grid-cols-3 gap-2">

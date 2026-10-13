@@ -86,6 +86,11 @@ function QueueTable({ items, onOpen }: { items: QueueItem[]; onOpen: (caseId: st
               >
                 {item.caseId}
               </button>
+              {item.dataProblems.length > 0 && (
+                <Badge variant="outline" className="ml-2 border-amber-500 text-amber-700" title={item.dataProblems.join('\n')}>
+                  data problem
+                </Badge>
+              )}
             </TableCell>
             <TableCell>{item.documentType ?? '—'}</TableCell>
             <TableCell>

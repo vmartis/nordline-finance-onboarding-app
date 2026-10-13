@@ -8,6 +8,8 @@ export type QueueItem = {
   attempt: number
   deadline: string | null
   minutesLeft: number | null
+  /** Plain-English notes on what was wrong in the export. */
+  dataProblems: string[]
 }
 
 /** GET /api/cases/{id}: the opened case, the only place with personal data. */
@@ -24,6 +26,7 @@ export type CaseDetail = {
   flags: string[]
   scores: { documentAuthenticity: number | null; faceMatch: number | null; liveness: number | null }
   notes: string | null
+  dataProblems: string[]
 }
 
 export type Reviewer = { id: string; team: string; shift: string }
