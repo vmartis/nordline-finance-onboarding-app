@@ -5,3 +5,6 @@
 !settings.gradle.kts
 !build.gradle.kts
 !src/
+!web/
+web/node_modules/
+web/dist/

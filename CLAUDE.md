@@ -14,6 +14,13 @@ Sources of truth: README.md (assignment), PRODUCT_NOTE.md (who/what/not), PLAN.m
 - Use only libraries you are sure exist; check before adding. Don't install system tools; use what the environment has.
 - After each slice: update PLAN.md status, append to DECISIONS.md if a decision was made, commit.
 
+## Frontend
+- Vite + React + TypeScript strict + Tailwind CSS + shadcn/ui + lucide-react, TanStack Query, React Router, react-hook-form + zod, sonner;
+  created with the official CLIs (npm create vite@latest web -- --template react-ts, npx shadcn@latest init/add), latest stable versions;
+  built in Docker and served by the backend on :8080 (API under /api, SPA fallback to index.html), Vite proxy /api in dev;
+  modern look: app shell with header, Cards, shadcn Table with status Badges, one primary Button per screen, Dialog/Sheet for details,
+  Skeleton loading, empty and error states, toasts; system font stack; no other UI libraries.
+
 ## Security (proportional, but always)
 - Validate all input; parameterized queries only; no secrets in code; no personal data in logs or error messages.
 - Authorization on every data access if users or tenants exist. If auth is needed and the stack allows, JWT bearer tokens

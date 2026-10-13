@@ -26,6 +26,14 @@ class SkeletonTest {
     }
 
     @Test
+    fun `browser routes fall back to the single-page app, api paths do not`() {
+        mockMvc.get("/cases/VC-1").andExpect { forwardedUrl("/index.html") }
+        mockMvc.get("/some-page").andExpect { forwardedUrl("/index.html") }
+        mockMvc.get("/api/does-not-exist").andExpect { status { isNotFound() } }
+        mockMvc.get("/assets/missing.js").andExpect { status { isNotFound() } }
+    }
+
+    @Test
     fun `flyway creates the tables`() {
         val tables = jdbc.queryForList(
             "select table_name from information_schema.tables where table_schema = 'public'",

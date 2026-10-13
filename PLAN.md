@@ -1,8 +1,8 @@
 # Plan
 
-**Now:** S2a done (20:01) · **Next:** S2b decide a case · **Elapsed:** 0:54 (20:01; start 19:07, live by 20:37, end 22:07)
+**Now:** React SPA done (20:12) · **Next:** S2b decide a case · **Elapsed:** 1:05 (20:12; start 19:07, live by 20:37, end 22:07)
 
-User: the reviewer. Stack: Kotlin + Spring Boot, PostgreSQL, one plain HTML/JS page. Tests: `./gradlew test`.
+User: the reviewer. Stack: Kotlin + Spring Boot, PostgreSQL, React SPA in `web/` (see CLAUDE.md "Frontend"). Tests: `./gradlew test`, `npm test` in `web/` (also run in the Docker build).
 Each slice: tests first for logic → `./deploy.sh` → check on http://localhost:8080 → tick ✓ → commit.
 
 | # | Slice (what the user can do after it) | Done when (check) | Min | ✓ |
