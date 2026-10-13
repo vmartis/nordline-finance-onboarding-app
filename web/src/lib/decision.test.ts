@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { decisionSchema, errorMessage, rememberedReviewer } from './decision'
+import { attemptFor, decisionSchema, errorMessage, rememberedReviewer, type DecisionInput } from './decision'
 
 const valid = { reviewer: 'j.sebo', decision: 'APPROVE', reasonCode: 'VERIFIED_MANUAL', comment: 'Face matches' }
 
@@ -41,5 +41,22 @@ describe('rememberedReviewer', () => {
   it('drops a remembered name that is not on the list, so nobody saves under a hidden name', () => {
     expect(rememberedReviewer('someone.else', reviewers)).toBe('')
     expect(rememberedReviewer(null, reviewers)).toBe('')
+  })
+})
+
+describe('attemptFor', () => {
+  let n = 0
+  const newKey = () => `key-${++n}`
+
+  it('reuses the key when the same decision is saved again (retry or double click)', () => {
+    const first = attemptFor(valid as DecisionInput, null, newKey)
+    const again = attemptFor({ ...valid } as DecisionInput, first, newKey)
+    expect(again.key).toBe(first.key)
+  })
+
+  it('uses a new key when the reviewer changed anything', () => {
+    const first = attemptFor(valid as DecisionInput, null, newKey)
+    const changed = attemptFor({ ...valid, reasonCode: 'FACE_MISMATCH' } as DecisionInput, first, newKey)
+    expect(changed.key).not.toBe(first.key)
   })
 })

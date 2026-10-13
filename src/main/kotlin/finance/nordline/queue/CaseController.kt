@@ -11,12 +11,15 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestClientException
 import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
 import java.time.LocalDate
+import java.util.UUID
 
 data class Scores(val documentAuthenticity: Double?, val faceMatch: Double?, val liveness: Double?)
 
@@ -50,6 +53,7 @@ data class DecisionRequest(
 data class DecisionResult(val caseId: String, val status: String)
 
 private const val CASE_ID = "[A-Za-z0-9-]{1,40}"
+private const val UUID_PATTERN = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 
 /** What the Case API may answer after a decision (see its docstring). */
 private val DECIDED_STATUSES = setOf("APPROVED", "REJECTED", "RECAPTURE_REQUESTED", "ESCALATED")
@@ -60,6 +64,7 @@ class CaseController(
     private val cases: CaseRepository,
     private val reference: ReferenceData,
     private val caseApi: CaseApiClient,
+    private val decisionLog: DecisionLog,
 ) {
 
     /** Holds personal data, so the browser must not keep a copy (shared reviewer PCs). */
@@ -69,10 +74,14 @@ class CaseController(
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(detail)
     }
 
-    /** The Case API is the official record: our copy changes only after it confirms. */
+    /**
+     * The Case API is the official record: our copy changes only after it confirms.
+     * The browser sends one idempotency key per decision, so retries and double clicks never save twice.
+     */
     @PostMapping("/{caseId}/decision")
     fun decide(
         @PathVariable @Pattern(regexp = CASE_ID) caseId: String,
+        @RequestHeader("Idempotency-Key") @Pattern(regexp = UUID_PATTERN) idempotencyKey: String,
         @RequestBody @Valid decision: DecisionRequest,
     ): DecisionResult {
         cases.findDetail(caseId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Case not found.")
@@ -82,21 +91,46 @@ class CaseController(
         if (!reference.isReasonCode(decision.reasonCode)) {
             throw ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT, "Unknown reason code.")
         }
+        val key = UUID.fromString(idempotencyKey)
         val confirmed = try {
-            caseApi.decide(caseId, decision)
+            caseApi.decide(caseId, decision, key)
+        } catch (_: HttpClientErrorException.Conflict) {
+            throw alreadyDecided(caseId)
+        } catch (_: HttpClientErrorException.UnprocessableContent) {
+            throw ResponseStatusException(
+                HttpStatus.UNPROCESSABLE_CONTENT,
+                "The back office refused this decision or reason code. Nothing was saved; check the choices.",
+            )
         } catch (_: RestClientException) {
             throw ResponseStatusException(
                 HttpStatus.BAD_GATEWAY,
-                "The back office did not confirm the decision, so nothing was saved. Try again.",
+                "The back office did not confirm the decision. It is safe to press Save again: " +
+                    "the same decision is sent with the same key and can never be saved twice.",
             )
         }
-        if (confirmed.status !in DECIDED_STATUSES) {
+        // The legacy API answers a known key with that key's original case, whatever the URL says.
+        // Only an answer for this case and this exact decision counts as confirmation.
+        val d = confirmed.decision
+        val matches = confirmed.caseId == caseId && d != null && d.reviewer == decision.reviewer &&
+            d.decision == decision.decision.name && d.reasonCode == decision.reasonCode
+        if (!matches || confirmed.status !in DECIDED_STATUSES) {
             throw ResponseStatusException(
                 HttpStatus.BAD_GATEWAY,
                 "The back office gave an unexpected answer. Check the case in the back office before deciding again.",
             )
         }
-        cases.setStatus(caseId, confirmed.status)
+        decisionLog.recordConfirmed(caseId, decision, key, confirmed.status)
         return DecisionResult(caseId, confirmed.status)
+    }
+
+    /** 409: someone decided it elsewhere (e.g. in the old tool). Refresh our copy and say who. */
+    private fun alreadyDecided(caseId: String): ResponseStatusException {
+        val fresh = try { caseApi.case(caseId) } catch (_: RestClientException) { null }
+        if (fresh != null && fresh.status in DECIDED_STATUSES) cases.setStatus(caseId, fresh.status)
+        val who = fresh?.let { f -> " (${f.status}" + (f.decision?.reviewer?.let { " by $it" } ?: "") + ")" } ?: ""
+        return ResponseStatusException(
+            HttpStatus.CONFLICT,
+            "This case was already decided in the back office$who. Nothing new was saved.",
+        )
     }
 }

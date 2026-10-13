@@ -36,7 +36,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init)
   if (!response.ok) {
     const body = await response.json().catch(() => null)
-    throw new Error(errorMessage(body, response.status))
+    throw new ApiError(errorMessage(body, response.status), response.status)
   }
   return response.json()
 }
@@ -46,9 +46,19 @@ export const fetchCase = (caseId: string) => request<CaseDetail>(`/api/cases/${e
 export const fetchReviewers = () => request<Reviewer[]>('/api/reviewers')
 export const fetchReasonCodes = () => request<ReasonCode[]>('/api/reason-codes')
 
-export const postDecision = (caseId: string, decision: DecisionInput) =>
+/** Thrown for a non-OK answer; status lets the screen react (e.g. 409 = already decided). */
+export class ApiError extends Error {
+  readonly status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+  }
+}
+
+export const postDecision = (caseId: string, decision: DecisionInput, idempotencyKey: string) =>
   request<{ caseId: string; status: string }>(`/api/cases/${encodeURIComponent(caseId)}/decision`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
     body: JSON.stringify(decision),
   })

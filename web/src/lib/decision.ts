@@ -29,3 +29,17 @@ export function errorMessage(body: unknown, status: number): string {
 export function rememberedReviewer(saved: string | null, reviewers: { id: string }[]): string {
   return saved !== null && reviewers.some((r) => r.id === saved) ? saved : ''
 }
+
+/** One save attempt: the decision and its idempotency key. */
+export type Attempt = { input: DecisionInput; key: string }
+
+/** Same decision again (retry, double click) keeps its key, so the back office saves it once; any change gets a new key. */
+export function attemptFor(input: DecisionInput, last: Attempt | null, newKey: () => string): Attempt {
+  const same =
+    last !== null &&
+    last.input.reviewer === input.reviewer &&
+    last.input.decision === input.decision &&
+    last.input.reasonCode === input.reasonCode &&
+    last.input.comment.trim() === input.comment.trim()
+  return same ? last : { input, key: newKey() }
+}

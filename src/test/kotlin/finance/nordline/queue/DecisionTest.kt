@@ -3,11 +3,13 @@ package finance.nordline.queue
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock.aResponse
 import com.github.tomakehurst.wiremock.client.WireMock.equalTo
+import com.github.tomakehurst.wiremock.client.WireMock.get
 import com.github.tomakehurst.wiremock.client.WireMock.equalToJson
 import com.github.tomakehurst.wiremock.client.WireMock.matching
 import com.github.tomakehurst.wiremock.client.WireMock.post
 import com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor
 import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
+import com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -28,6 +30,7 @@ class DecisionTest {
     @BeforeEach
     fun setUp() {
         caseApi.resetAll()
+        jdbc.update("delete from decision_log")
         jdbc.update("delete from verification_case")
         jdbc.update(
             """insert into verification_case (case_id, status, created_at, sla_hours, full_name, document_type,
@@ -37,10 +40,15 @@ class DecisionTest {
         )
     }
 
-    private fun decide(body: String) = mockMvc.post("/api/cases/VC-1/decision") {
+    private val key = "6f1c2a7e-3b4d-4e5f-8a9b-0c1d2e3f4a5b"
+
+    private fun decide(body: String, idempotencyKey: String? = key) = mockMvc.post("/api/cases/VC-1/decision") {
         contentType = MediaType.APPLICATION_JSON
         content = body
+        if (idempotencyKey != null) header("Idempotency-Key", idempotencyKey)
     }
+
+    private fun logRows() = jdbc.queryForList("select case_id, reviewer, decision, reason_code, api_status from decision_log")
 
     /** Same shape as the real Case API reply: the whole case, with the decision inside (fictional values). */
     private val caseApiReply = """
@@ -73,12 +81,86 @@ class DecisionTest {
         caseApi.verify(
             postRequestedFor(urlEqualTo("/cases/VC-1/decision"))
                 .withHeader("X-Api-Key", equalTo("test-case-api-key"))
+                .withHeader("Idempotency-Key", equalTo(key))
                 // The legacy server reads exactly Content-Length bytes; a chunked body arrives as empty.
                 .withHeader("Content-Length", matching("[1-9][0-9]*"))
                 .withRequestBody(equalToJson(validDecision)),
         )
         assertThat(statusOf("VC-1")).isEqualTo("APPROVED")
         mockMvc.get("/api/queue").andExpect { jsonPath("$.length()") { value(0) } }
+        assertThat(logRows()).containsExactly(
+            mapOf("case_id" to "VC-1", "reviewer" to "j.sebo", "decision" to "APPROVE",
+                "reason_code" to "VERIFIED_MANUAL", "api_status" to "APPROVED"),
+        )
+    }
+
+    @Test
+    fun `the same decision sent twice with the same key is logged once`() {
+        caseApi.stubFor(post(urlEqualTo("/cases/VC-1/decision")).willReturn(
+            aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(caseApiReply),
+        ))
+
+        decide(validDecision).andExpect { status { isOk() } }
+        decide(validDecision).andExpect { status { isOk() } }
+
+        assertThat(logRows()).hasSize(1)
+    }
+
+    @Test
+    fun `503 then ok gives exactly one decision, sent with the same idempotency key`() {
+        val url = urlEqualTo("/cases/VC-1/decision")
+        caseApi.stubFor(post(url).inScenario("flaky").whenScenarioStateIs(STARTED)
+            .willReturn(aResponse().withStatus(503)).willSetStateTo("recovered"))
+        caseApi.stubFor(post(url).inScenario("flaky").whenScenarioStateIs("recovered")
+            .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(caseApiReply)))
+
+        decide(validDecision).andExpect { status { isOk() } }
+
+        caseApi.verify(2, postRequestedFor(url).withHeader("Idempotency-Key", equalTo(key)))
+        assertThat(logRows()).hasSize(1)
+        assertThat(statusOf("VC-1")).isEqualTo("APPROVED")
+    }
+
+    @Test
+    fun `already decided elsewhere refreshes the case from the case api and says who decided`() {
+        caseApi.stubFor(post(urlEqualTo("/cases/VC-1/decision"))
+            .willReturn(aResponse().withStatus(409).withBody("""{"error":"case is ESCALATED"}""")))
+        caseApi.stubFor(get(urlEqualTo("/cases/VC-1")).willReturn(
+            aResponse().withStatus(200).withHeader("Content-Type", "application/json")
+                .withBody(caseApiReply.replace("APPROVED", "ESCALATED").replace("\"reviewer\":\"j.sebo\"", "\"reviewer\":\"t.weber\"")),
+        ))
+
+        decide(validDecision).andExpect {
+            status { isConflict() }
+            jsonPath("$.detail") { value("This case was already decided in the back office (ESCALATED by t.weber). Nothing new was saved.") }
+        }
+
+        assertThat(statusOf("VC-1")).isEqualTo("ESCALATED")
+        assertThat(logRows()).isEmpty()
+    }
+
+    @Test
+    fun `case api refusing the decision (422) is shown and nothing is saved`() {
+        caseApi.stubFor(post(urlEqualTo("/cases/VC-1/decision"))
+            .willReturn(aResponse().withStatus(422).withBody("""{"error":"decision, reasonCode and reviewer are required"}""")))
+
+        decide(validDecision).andExpect {
+            status { isUnprocessableContent() }
+            jsonPath("$.detail") { value("The back office refused this decision or reason code. Nothing was saved; check the choices.") }
+        }
+
+        assertThat(statusOf("VC-1")).isEqualTo("PENDING_REVIEW")
+        assertThat(logRows()).isEmpty()
+    }
+
+    @Test
+    fun `empty reason or comment and a missing idempotency key are rejected before calling the case api`() {
+        decide(validDecision.replace("VERIFIED_MANUAL", "")).andExpect { status { isBadRequest() } }
+        decide(validDecision.replace("Face matches on closer look", "  ")).andExpect { status { isBadRequest() } }
+        decide(validDecision, idempotencyKey = null).andExpect { status { isBadRequest() } }
+        decide(validDecision, idempotencyKey = "not-a-uuid").andExpect { status { isBadRequest() } }
+
+        assertThat(caseApi.allServeEvents).isEmpty()
     }
 
     @Test
@@ -87,7 +169,28 @@ class DecisionTest {
 
         decide(validDecision).andExpect { status { isBadGateway() } }
 
+        caseApi.verify(3, postRequestedFor(urlEqualTo("/cases/VC-1/decision")).withHeader("Idempotency-Key", equalTo(key)))
         assertThat(statusOf("VC-1")).isEqualTo("PENDING_REVIEW")
+        assertThat(logRows()).isEmpty()
+    }
+
+    @Test
+    fun `an answer for another case or another decision (replayed key) changes nothing here`() {
+        val url = urlEqualTo("/cases/VC-1/decision")
+        for (reply in listOf(
+            caseApiReply.replace("\"caseId\":\"VC-1\"", "\"caseId\":\"VC-OTHER\""),
+            caseApiReply.replace("\"reviewer\":\"j.sebo\"", "\"reviewer\":\"t.weber\""),
+        )) {
+            caseApi.resetAll()
+            caseApi.stubFor(post(url).willReturn(
+                aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(reply),
+            ))
+
+            decide(validDecision).andExpect { status { isBadGateway() } }
+
+            assertThat(statusOf("VC-1")).isEqualTo("PENDING_REVIEW")
+            assertThat(logRows()).isEmpty()
+        }
     }
 
     @Test

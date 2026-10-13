@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CircleAlert, TriangleAlert } from 'lucide-react'
+import { useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -14,12 +15,13 @@ import {
   fetchCase,
   fetchReasonCodes,
   fetchReviewers,
+  ApiError,
   postDecision,
   type CaseDetail,
   type ReasonCode,
   type Reviewer,
 } from '@/lib/api'
-import { DECISIONS, decisionSchema, rememberedReviewer, type DecisionInput } from '@/lib/decision'
+import { attemptFor, DECISIONS, decisionSchema, rememberedReviewer, type Attempt, type DecisionInput } from '@/lib/decision'
 
 const LAST_REVIEWER = 'morning-queue.reviewer'
 
@@ -145,9 +147,10 @@ function DecisionForm(props: { caseId: string; onDone: () => void; reviewers: Re
     resolver: zodResolver(decisionSchema),
     defaultValues: { reviewer: rememberedReviewer(lastReviewer(), props.reviewers), reasonCode: '', comment: '' },
   })
+  const lastAttempt = useRef<Attempt | null>(null)
   const save = useMutation({
-    mutationFn: (input: DecisionInput) => postDecision(caseId, input),
-    onSuccess: (result, input) => {
+    mutationFn: ({ input, key }: Attempt) => postDecision(caseId, input, key),
+    onSuccess: (result, { input }) => {
       try {
         localStorage.setItem(LAST_REVIEWER, input.reviewer)
       } catch {
@@ -158,12 +161,22 @@ function DecisionForm(props: { caseId: string; onDone: () => void; reviewers: Re
       queryClient.invalidateQueries({ queryKey: ['case', caseId] })
       onDone()
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) => {
+      toast.error(error.message)
+      if (error instanceof ApiError && error.status === 409) {
+        // Decided elsewhere: show the fresh status; the form disappears because the case is no longer pending.
+        queryClient.invalidateQueries({ queryKey: ['queue'] })
+        queryClient.invalidateQueries({ queryKey: ['case', caseId] })
+      }
+    },
   })
   const errors = form.formState.errors
 
   return (
-    <form onSubmit={form.handleSubmit((input) => save.mutate(input))} className="space-y-4 border-t pt-4" noValidate>
+    <form onSubmit={form.handleSubmit((input) => {
+        lastAttempt.current = attemptFor(input, lastAttempt.current, () => crypto.randomUUID())
+        save.mutate(lastAttempt.current)
+      })} className="space-y-4 border-t pt-4" noValidate>
       <h3 className="font-medium">Decision</h3>
       <Field label="Your name" id="reviewer" error={errors.reviewer?.message}>
         <NativeSelect id="reviewer" className="w-full" {...form.register('reviewer')}>
