@@ -10,6 +10,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { fetchQueue, takeNext, type QueueItem } from '@/lib/api'
+import { backlogSummary } from '@/lib/backlog'
 import { timeLeft } from '@/lib/time-left'
 
 export function QueuePage() {
@@ -47,6 +48,7 @@ export function QueuePage() {
           </CardAction>
         </CardHeader>
         <CardContent>
+          {queue.data && queue.data.length > 0 && <BacklogStrip items={queue.data} />}
           {queue.isPending && <LoadingRows />}
           {queue.isError && (
             <EmptyState
@@ -131,6 +133,29 @@ function QueueTable({ items, onOpen }: { items: QueueItem[]; onOpen: (caseId: st
         ))}
       </TableBody>
     </Table>
+  )
+}
+
+/** One line with the pressure at a glance; same rules as the time badges. */
+function BacklogStrip({ items }: { items: QueueItem[] }) {
+  const { overdue, soon, later, unknown } = backlogSummary(items)
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-2 text-sm" aria-label="Backlog by time left">
+      {/* A zero count stays grey: no alarm when nothing is late. */}
+      <Badge variant={overdue > 0 ? 'destructive' : 'secondary'}>{overdue} overdue</Badge>
+      <Badge
+        variant={soon > 0 ? 'outline' : 'secondary'}
+        className={soon > 0 ? 'border-orange-500 bg-orange-50 text-orange-700' : undefined}
+      >
+        {soon} due within 1 h
+      </Badge>
+      <Badge variant="secondary">{later} later</Badge>
+      {unknown > 0 && (
+        <Badge variant="outline" className="border-amber-500 text-amber-700">
+          {unknown} deadline unknown
+        </Badge>
+      )}
+    </div>
   )
 }
 

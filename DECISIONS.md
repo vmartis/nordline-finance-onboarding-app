@@ -54,3 +54,4 @@
 | 21:13 | After 5 wrong passwords a name is locked for 15 minutes (in memory, per app instance); bcrypt cost 10 in the user script; existing local users re-hashed (password still 12345) | No limit; cost 6 | The shared default password makes guessing easy; equal cost removes most of the timing signal (a ~30 ms gap remains) | Claude |
 | 21:13 | Decisions and claims always use the logged-in user; the name sent by the browser is ignored; the name pickers are gone | Keep the picker | A decision can no longer be saved under someone else's name | Claude |
 | 21:13 | Open risk: every user starts with password 12345 and there is no "change password" yet | Force change at first login | Human's decision; suggested as the next step | Claude |
+| 21:20 | Backlog strip counts use the same time-left rules as the row badges; zero counts are grey | Separate counting; always coloured | Strip and rows can never disagree; a red "0 overdue" would be a false alarm (reviewer) | Claude |

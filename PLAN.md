@@ -1,6 +1,6 @@
 # Plan
 
-**Now:** N0a+N0b login done (21:13) · **Next:** short friction pass, close note · **Elapsed:** 2:06 (21:13; start 19:07, live by 20:37, end 22:07)
+**Now:** N2 done (21:20) · **Next:** short friction pass, close note · **Elapsed:** 2:13 (21:20; start 19:07, live by 20:37, end 22:07)
 
 User: the reviewer. Stack: Kotlin + Spring Boot, PostgreSQL, React SPA in `web/` (see CLAUDE.md "Frontend"). Tests: `./gradlew test`, `npm test` in `web/` (also run in the Docker build).
 Each slice: tests first for logic → `./deploy.sh` → check on http://localhost:8080 → tick ✓ → commit.
@@ -34,7 +34,7 @@ After the build: use it myself + FRICTION.md fixes (~25 min) → `reviewer` and 
 | 2 | N0b | **Login, screen.** Login page; token kept in memory and sent with every call; logout; name shown in the header instead of the name picker | Needs N0a | N0a | `web/` login page, `api.ts` auth header, router guard | 15 | ✓ |
 | 3 | N9 | **Deadline highlight** (human's request, 21:02). Whole queue rows highlighted: danger (red) when less than 1 h is left or overdue, warning (amber) when less than 2 h is left, so urgent cases stand out at a glance | MVP marks only the time badge (red overdue, orange < 1 h) | S5 | `web/src/lib/time-left.ts` (+ test for the 1 h / 2 h edges), `web/src/pages/queue-page.tsx` | 10 | |
 | 4 | N1 | **Save & next.** After saving, the next most urgent free case opens by itself: one click less on each of 120–150 cases | MVP works without it; needs claims first | S4, S5 | `web/src/components/case-sheet.tsx`, claim endpoint | 10 | |
-| 5 | N2 | **Backlog strip.** One line above the queue: "3 overdue · 12 due within 1 h · 118 later", so the reviewer sees the pressure at a glance | Queue already sorts by urgency; this is a summary on top | S5 (overdue/<1 h marks) | `web/src/pages/queue-page.tsx` (from `/api/queue`, no backend change) | 10 | |
+| 5 | N2 | **Backlog strip.** One line above the queue: "3 overdue · 12 due within 1 h · 118 later", so the reviewer sees the pressure at a glance | Queue already sorts by urgency; this is a summary on top | S5 (overdue/<1 h marks) | `web/src/pages/queue-page.tsx` (from `/api/queue`, no backend change) | 10 | ✓ |
 | 6 | N3 | **My decisions today.** A list of what I saved and what the back office answered, so I never wonder "did that go through?" | Needs the decision log from S4 | S4 | new `GET /api/decisions?reviewer=`, small sheet/page in `web/` | 15 | |
 | 7 | N4 | **Reason codes that fit the decision.** After "Approve", only approve-type reasons are offered, so new colleagues can't pick a contradicting reason | The mapping is a compliance rule; must be confirmed, shown as guidance | S2b | `web/src/lib/decision.ts`, `case-sheet.tsx` | 10 | |
 | 8 | N5 | **Put a case back.** Release a taken case I can't finish, so it doesn't sit blocked until its SLA runs out | Rare in the first morning; claims come with S5 | S5 | claim endpoint + button in `case-sheet.tsx` | 10 | |
