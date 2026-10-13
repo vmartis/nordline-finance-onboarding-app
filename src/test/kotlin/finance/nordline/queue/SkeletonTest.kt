@@ -3,11 +3,13 @@ package finance.nordline.queue
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.security.test.context.support.WithMockUser
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 
 @IntegrationTest
+@WithMockUser(username = "j.sebo")
 class SkeletonTest {
 
     @Autowired lateinit var mockMvc: MockMvc

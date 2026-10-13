@@ -14,13 +14,16 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.security.test.context.support.WithMockUser
 import org.springframework.http.MediaType
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 
 @IntegrationTest
+@WithMockUser(username = "j.sebo")
 class DecisionTest {
 
     @Autowired lateinit var mockMvc: MockMvc
@@ -43,11 +46,13 @@ class DecisionTest {
 
     private val key = "6f1c2a7e-3b4d-4e5f-8a9b-0c1d2e3f4a5b"
 
-    private fun decide(body: String, idempotencyKey: String? = key) = mockMvc.post("/api/cases/VC-1/decision") {
-        contentType = MediaType.APPLICATION_JSON
-        content = body
-        if (idempotencyKey != null) header("Idempotency-Key", idempotencyKey)
-    }
+    private fun decide(body: String, idempotencyKey: String? = key, asUser: String = "j.sebo") =
+        mockMvc.post("/api/cases/VC-1/decision") {
+            with(user(asUser))
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+            if (idempotencyKey != null) header("Idempotency-Key", idempotencyKey)
+        }
 
     private fun logRows() = jdbc.queryForList("select case_id, reviewer, decision, reason_code, api_status from decision_log")
 
@@ -105,6 +110,18 @@ class DecisionTest {
         decide(validDecision).andExpect { status { isOk() } }
 
         assertThat(logRows()).hasSize(1)
+    }
+
+    @Test
+    fun `the decision is always made as the logged-in user, whatever name the browser sends`() {
+        caseApi.stubFor(post(urlEqualTo("/cases/VC-1/decision")).willReturn(
+            aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(caseApiReply),
+        ))
+
+        decide(validDecision.replace("j.sebo", "t.weber")).andExpect { status { isOk() } }
+
+        caseApi.verify(postRequestedFor(urlEqualTo("/cases/VC-1/decision")).withRequestBody(equalToJson(validDecision)))
+        assertThat(logRows().single()["reviewer"]).isEqualTo("j.sebo")
     }
 
     @Test
@@ -211,7 +228,7 @@ class DecisionTest {
     @Test
     fun `unknown reason code or reviewer is refused before calling the case api`() {
         decide(validDecision.replace("VERIFIED_MANUAL", "MADE_UP")).andExpect { status { isUnprocessableContent() } }
-        decide(validDecision.replace("j.sebo", "nobody")).andExpect { status { isUnprocessableContent() } }
+        decide(validDecision, asUser = "nobody").andExpect { status { isUnprocessableContent() } }
         decide(validDecision.replace("APPROVE", "MAYBE")).andExpect { status { isBadRequest() } }
 
         assertThat(caseApi.allServeEvents).isEmpty()

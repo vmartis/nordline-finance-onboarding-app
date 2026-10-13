@@ -1,17 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CircleAlert, Inbox, Play } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { CaseSheet } from '@/components/case-sheet'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { fetchQueue, fetchReviewers, takeNext, type QueueItem } from '@/lib/api'
-import { loadReviewer, saveReviewer } from '@/lib/reviewer'
+import { fetchQueue, takeNext, type QueueItem } from '@/lib/api'
 import { timeLeft } from '@/lib/time-left'
 
 export function QueuePage() {
@@ -19,11 +17,8 @@ export function QueuePage() {
   const { caseId } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const reviewers = useQuery({ queryKey: ['reviewers'], queryFn: fetchReviewers, staleTime: Infinity })
-  const [reviewer, setReviewer] = useState(() => loadReviewer() ?? '')
-  const knownReviewer = reviewers.data?.some((r) => r.id === reviewer) ? reviewer : ''
   const next = useMutation({
-    mutationFn: () => takeNext(knownReviewer),
+    mutationFn: takeNext,
     onSuccess: (nextCaseId) => {
       queryClient.invalidateQueries({ queryKey: ['queue'] })
       if (nextCaseId) navigate(`/cases/${encodeURIComponent(nextCaseId)}`)
@@ -40,54 +35,39 @@ export function QueuePage() {
     <>
       <CaseSheet caseId={caseId} onClose={() => navigate('/')} />
       <Card>
-      <CardHeader>
-        <CardTitle>Pending cases</CardTitle>
-        <CardDescription>
-          {queue.data ? `${queue.data.length} pending cases, most urgent first` : 'Most urgent first'}
-        </CardDescription>
-        <CardAction className="flex items-center gap-2">
-          <NativeSelect
-            aria-label="Your name"
-            value={knownReviewer}
-            onChange={(e) => {
-              setReviewer(e.target.value)
-              saveReviewer(e.target.value)
-            }}
-          >
-            <NativeSelectOption value="">Pick your name</NativeSelectOption>
-            {reviewers.data?.map((r) => (
-              <NativeSelectOption key={r.id} value={r.id}>
-                {r.id}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-          <Button onClick={() => next.mutate()} disabled={!knownReviewer || next.isPending}>
-            <Play aria-hidden /> {next.isPending ? 'Taking…' : 'Take next'}
-          </Button>
-        </CardAction>
-      </CardHeader>
-      <CardContent>
-        {queue.isPending && <LoadingRows />}
-        {queue.isError && (
-          <EmptyState
-            icon={<CircleAlert className="size-8 text-destructive" aria-hidden />}
-            title="Could not load the queue"
-            text="The server did not answer. Your data is safe; try again."
-            action={<Button onClick={() => queue.refetch()}>Try again</Button>}
-          />
-        )}
-        {queue.data?.length === 0 && (
-          <EmptyState
-            icon={<Inbox className="size-8 text-muted-foreground" aria-hidden />}
-            title="No pending cases"
-            text="Nothing is waiting for review. New cases appear after the next import."
-          />
-        )}
-        {queue.data && queue.data.length > 0 && (
-          <QueueTable items={queue.data} onOpen={(id) => navigate(`/cases/${encodeURIComponent(id)}`)} />
-        )}
-      </CardContent>
-    </Card>
+        <CardHeader>
+          <CardTitle>Pending cases</CardTitle>
+          <CardDescription>
+            {queue.data ? `${queue.data.length} pending cases, most urgent first` : 'Most urgent first'}
+          </CardDescription>
+          <CardAction className="flex items-center gap-2">
+            <Button onClick={() => next.mutate()} disabled={next.isPending}>
+              <Play aria-hidden /> {next.isPending ? 'Taking…' : 'Take next'}
+            </Button>
+          </CardAction>
+        </CardHeader>
+        <CardContent>
+          {queue.isPending && <LoadingRows />}
+          {queue.isError && (
+            <EmptyState
+              icon={<CircleAlert className="size-8 text-destructive" aria-hidden />}
+              title="Could not load the queue"
+              text="The server did not answer. Your data is safe; try again."
+              action={<Button onClick={() => queue.refetch()}>Try again</Button>}
+            />
+          )}
+          {queue.data?.length === 0 && (
+            <EmptyState
+              icon={<Inbox className="size-8 text-muted-foreground" aria-hidden />}
+              title="No pending cases"
+              text="Nothing is waiting for review. New cases appear after the next import."
+            />
+          )}
+          {queue.data && queue.data.length > 0 && (
+            <QueueTable items={queue.data} onOpen={(id) => navigate(`/cases/${encodeURIComponent(id)}`)} />
+          )}
+        </CardContent>
+      </Card>
     </>
   )
 }
@@ -127,7 +107,11 @@ function QueueTable({ items, onOpen }: { items: QueueItem[]; onOpen: (caseId: st
                 </Badge>
               )}
               {item.dataProblems.length > 0 && (
-                <Badge variant="outline" className="ml-2 border-amber-500 text-amber-700" title={item.dataProblems.join('\n')}>
+                <Badge
+                  variant="outline"
+                  className="ml-2 border-amber-500 text-amber-700"
+                  title={item.dataProblems.join('\n')}
+                >
                   data problem
                 </Badge>
               )}

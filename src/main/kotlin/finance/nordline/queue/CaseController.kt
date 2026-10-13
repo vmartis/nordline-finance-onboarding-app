@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Size
 import org.springframework.http.CacheControl
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -47,9 +48,9 @@ data class OtherAttempt(val caseId: String, val attempt: Int, val status: String
 
 enum class Decision { APPROVE, REJECT, REQUEST_RECAPTURE, ESCALATE }
 
-/** Sent to the Case API as is. */
+/** Sent to the Case API. The reviewer is always the logged-in user; a name sent by the browser is ignored. */
 data class DecisionRequest(
-    @field:NotBlank @field:Size(max = 40) val reviewer: String,
+    @field:Size(max = 40) val reviewer: String = "",
     val decision: Decision,
     @field:NotBlank @field:Size(max = 40) val reasonCode: String,
     @field:NotBlank @field:Size(max = 500) val comment: String,
@@ -88,8 +89,10 @@ class CaseController(
     fun decide(
         @PathVariable @Pattern(regexp = CASE_ID) caseId: String,
         @RequestHeader("Idempotency-Key") @Pattern(regexp = UUID_PATTERN) idempotencyKey: String,
-        @RequestBody @Valid decision: DecisionRequest,
+        @RequestBody @Valid body: DecisionRequest,
+        user: Authentication,
     ): DecisionResult {
+        val decision = body.copy(reviewer = user.name)
         cases.findDetail(caseId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Case not found.")
         if (!reference.isReviewer(decision.reviewer)) {
             throw ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT, "Unknown reviewer.")

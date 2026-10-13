@@ -4,7 +4,8 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.http.MediaType
+import org.springframework.security.test.context.support.WithMockUser
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
@@ -14,6 +15,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 @IntegrationTest
+@WithMockUser(username = "j.sebo")
 class ClaimTest {
 
     @Autowired lateinit var mockMvc: MockMvc
@@ -33,10 +35,8 @@ class ClaimTest {
         id, status, createdAt,
     )
 
-    private fun takeNext(reviewer: String) = mockMvc.post("/api/claims/next") {
-        contentType = MediaType.APPLICATION_JSON
-        content = """{"reviewer":"$reviewer"}"""
-    }
+    /** Take next as the logged-in user. */
+    private fun takeNext(reviewer: String) = mockMvc.post("/api/claims/next") { with(user(reviewer)) }
 
     @Test
     fun `two reviewers pressing take next at the same moment never get the same case`() {
@@ -82,9 +82,8 @@ class ClaimTest {
     }
 
     @Test
-    fun `unknown reviewer cannot take a case`() {
+    fun `a logged-in user who is not a reviewer cannot take a case`() {
         case("VC-1", "2026-10-14T05:00:00Z")
         takeNext("nobody").andExpect { status { isUnprocessableContent() } }
-        takeNext("").andExpect { status { isBadRequest() } }
     }
 }

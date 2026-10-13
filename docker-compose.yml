@@ -51,6 +51,9 @@ services:
       CASE_API_URL: http://case-api:9000
       CASE_API_KEY: ${CASE_API_KEY:-local-dev-key-change-me}
       REFERENCE_DIR: /reference
+      # Signs login tokens. No default on purpose: a known key would let anyone forge a login.
+      # ./deploy.sh generates a random one into .env (git-ignored) on the first run.
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is not set; run ./deploy.sh or put it in .env}
     # Only the two reference files; the customer export (cases.json) stays out of this container.
     volumes:
       - ./data/reviewers.json:/reference/reviewers.json:ro

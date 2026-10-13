@@ -2,6 +2,10 @@
 # Deploys the whole environment (legacy Case API + your app) with docker compose and checks that your app answers on :8080.
 set -euo pipefail
 cd "$(dirname "$0")"
+# Login tokens need a secret signing key; make a random one once and keep it out of git (.env is ignored).
+if ! grep -q '^JWT_SECRET=' .env 2>/dev/null; then
+  echo "JWT_SECRET=$(openssl rand -hex 32)" >> .env
+fi
 docker compose up -d --build
 echo "Waiting for your app on http://localhost:8080 ..."
 for i in $(seq 1 60); do

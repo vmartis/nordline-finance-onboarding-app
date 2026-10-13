@@ -1,6 +1,6 @@
 # Plan
 
-**Now:** S6 done, MVP built (21:02) · **Next:** use it myself + FRICTION.md · **Elapsed:** 1:55 (21:02; start 19:07, live by 20:37, end 22:07)
+**Now:** N0a+N0b login done (21:13) · **Next:** short friction pass, close note · **Elapsed:** 2:06 (21:13; start 19:07, live by 20:37, end 22:07)
 
 User: the reviewer. Stack: Kotlin + Spring Boot, PostgreSQL, React SPA in `web/` (see CLAUDE.md "Frontend"). Tests: `./gradlew test`, `npm test` in `web/` (also run in the Docker build).
 Each slice: tests first for logic → `./deploy.sh` → check on http://localhost:8080 → tick ✓ → commit.
@@ -30,8 +30,8 @@ After the build: use it myself + FRICTION.md fixes (~25 min) → `reviewer` and 
 ## If time allows (after MVP)
 | Prio | # | Item (what the user gains) | Why not in MVP | Depends on | Touches (files/areas) | Min | ✓ |
 |---|---|---|---|---|---|---|---|
-| 1 | N0a | **Login, backend** (omitted in note – OK given by human at 20:52). Reviewers log in with name + password; the API answers only with a valid JWT bearer token, and every decision and claim is made as the logged-in user (no more picking a name). Users are added to the DB by a script; default password for each user is `12345` (human's decision) | Note left login to the bank's systems; human asked for it as the first optional step | MVP done | users table (Flyway), `scripts/add-users.sh`, Spring Security resource server + `POST /api/auth/login` issuing the JWT (framework built-ins), `/api/**` protected except ingest (own API key) and login; tests | 20 | |
-| 2 | N0b | **Login, screen.** Login page; token kept in memory and sent with every call; logout; name shown in the header instead of the name picker | Needs N0a | N0a | `web/` login page, `api.ts` auth header, router guard | 15 | |
+| 1 | N0a | **Login, backend** (omitted in note – OK given by human at 20:52). Reviewers log in with name + password; the API answers only with a valid JWT bearer token, and every decision and claim is made as the logged-in user (no more picking a name). Users are added to the DB by a script; default password for each user is `12345` (human's decision) | Note left login to the bank's systems; human asked for it as the first optional step | MVP done | users table (Flyway), `scripts/add-users.sh`, Spring Security resource server + `POST /api/auth/login` issuing the JWT (framework built-ins), `/api/**` protected except ingest (own API key) and login; tests | 20 | ✓ |
+| 2 | N0b | **Login, screen.** Login page; token kept in memory and sent with every call; logout; name shown in the header instead of the name picker | Needs N0a | N0a | `web/` login page, `api.ts` auth header, router guard | 15 | ✓ |
 | 3 | N9 | **Deadline highlight** (human's request, 21:02). Whole queue rows highlighted: danger (red) when less than 1 h is left or overdue, warning (amber) when less than 2 h is left, so urgent cases stand out at a glance | MVP marks only the time badge (red overdue, orange < 1 h) | S5 | `web/src/lib/time-left.ts` (+ test for the 1 h / 2 h edges), `web/src/pages/queue-page.tsx` | 10 | |
 | 4 | N1 | **Save & next.** After saving, the next most urgent free case opens by itself: one click less on each of 120–150 cases | MVP works without it; needs claims first | S4, S5 | `web/src/components/case-sheet.tsx`, claim endpoint | 10 | |
 | 5 | N2 | **Backlog strip.** One line above the queue: "3 overdue · 12 due within 1 h · 118 later", so the reviewer sees the pressure at a glance | Queue already sorts by urgency; this is a summary on top | S5 (overdue/<1 h marks) | `web/src/pages/queue-page.tsx` (from `/api/queue`, no backend change) | 10 | |

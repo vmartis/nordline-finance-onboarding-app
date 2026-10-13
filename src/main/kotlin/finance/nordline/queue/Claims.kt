@@ -1,15 +1,12 @@
 package finance.nordline.queue
 
-import jakarta.validation.Valid
-import jakarta.validation.constraints.NotBlank
-import jakarta.validation.constraints.Size
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.jdbc.core.simple.JdbcClient
+import org.springframework.security.core.Authentication
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
 
@@ -53,19 +50,18 @@ class ClaimService(private val jdbc: JdbcClient) {
         ).param("reviewer", reviewer).query(String::class.java).optional().orElse(null)
 }
 
-data class ClaimRequest(@field:NotBlank @field:Size(max = 40) val reviewer: String)
 data class ClaimResult(val caseId: String)
 
 @RestController
 class ClaimController(private val claims: ClaimService, private val reference: ReferenceData) {
 
-    /** 200 with the case to work on, or 204 when every pending case is taken. */
+    /** 200 with the case to work on, or 204 when every pending case is taken. Always for the logged-in user. */
     @PostMapping("/api/claims/next")
-    fun takeNext(@RequestBody @Valid request: ClaimRequest): ResponseEntity<ClaimResult> {
-        if (!reference.isReviewer(request.reviewer)) {
-            throw ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT, "Unknown reviewer.")
+    fun takeNext(user: Authentication): ResponseEntity<ClaimResult> {
+        if (!reference.isReviewer(user.name)) {
+            throw ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT, "You are not on the reviewer list.")
         }
-        val caseId = claims.takeNext(request.reviewer) ?: return ResponseEntity.noContent().build()
+        val caseId = claims.takeNext(user.name) ?: return ResponseEntity.noContent().build()
         return ResponseEntity.ok(ClaimResult(caseId))
     }
 }

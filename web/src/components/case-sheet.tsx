@@ -12,26 +12,10 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  fetchCase,
-  fetchReasonCodes,
-  fetchReviewers,
-  ApiError,
-  postDecision,
-  type CaseDetail,
-  type ReasonCode,
-  type Reviewer,
-} from '@/lib/api'
+import { fetchCase, fetchReasonCodes, ApiError, postDecision, type CaseDetail, type ReasonCode } from '@/lib/api'
 import { flagInfo, scoreBandFor, type FlagSeverity, type ScoreBand } from '@/lib/flags'
-import { loadReviewer, saveReviewer } from '@/lib/reviewer'
-import {
-  attemptFor,
-  DECISIONS,
-  decisionSchema,
-  rememberedReviewer,
-  type Attempt,
-  type DecisionInput,
-} from '@/lib/decision'
+import { useSession } from '@/lib/auth'
+import { attemptFor, DECISIONS, decisionSchema, type Attempt, type DecisionInput } from '@/lib/decision'
 
 export function CaseSheet({ caseId, onClose }: { caseId: string | undefined; onClose: () => void }) {
   return (
@@ -213,47 +197,34 @@ function Fact({ label, value }: { label: string; value: string }) {
   )
 }
 
-/** The form appears only when reviewers and reason codes are loaded, so every default matches a visible option. */
+/** The form appears only when the reason codes are loaded, so every choice is a visible option. */
 function DecisionSection({ caseId, onDone }: { caseId: string; onDone: () => void }) {
-  const reviewers = useQuery({
-    queryKey: ['reviewers'],
-    queryFn: fetchReviewers,
-    staleTime: Infinity,
-  })
-  const reasonCodes = useQuery({
-    queryKey: ['reason-codes'],
-    queryFn: fetchReasonCodes,
-    staleTime: Infinity,
-  })
+  const session = useSession()
+  const reasonCodes = useQuery({ queryKey: ['reason-codes'], queryFn: fetchReasonCodes, staleTime: Infinity })
 
-  if (reviewers.isError || reasonCodes.isError) {
+  if (reasonCodes.isError) {
     return (
       <p className="flex items-center gap-2 border-t pt-4 text-sm text-destructive">
-        <CircleAlert className="size-4" aria-hidden /> Could not load reviewers or reason codes. Close and open the case
-        again.
+        <CircleAlert className="size-4" aria-hidden /> Could not load the reason codes. Close and open the case again.
       </p>
     )
   }
-  if (!reviewers.data || !reasonCodes.data) return <Skeleton className="h-64 w-full" />
-  return <DecisionForm caseId={caseId} onDone={onDone} reviewers={reviewers.data} reasonCodes={reasonCodes.data} />
+  if (!reasonCodes.data || !session) return <Skeleton className="h-64 w-full" />
+  return <DecisionForm caseId={caseId} onDone={onDone} reviewer={session.username} reasonCodes={reasonCodes.data} />
 }
 
-function DecisionForm(props: { caseId: string; onDone: () => void; reviewers: Reviewer[]; reasonCodes: ReasonCode[] }) {
+/** The reviewer is the logged-in user (the server uses the login, not this field). */
+function DecisionForm(props: { caseId: string; onDone: () => void; reviewer: string; reasonCodes: ReasonCode[] }) {
   const { caseId, onDone } = props
   const queryClient = useQueryClient()
   const form = useForm<DecisionInput>({
     resolver: zodResolver(decisionSchema),
-    defaultValues: {
-      reviewer: rememberedReviewer(loadReviewer(), props.reviewers),
-      reasonCode: '',
-      comment: '',
-    },
+    defaultValues: { reviewer: props.reviewer, reasonCode: '', comment: '' },
   })
   const lastAttempt = useRef<Attempt | null>(null)
   const save = useMutation({
     mutationFn: ({ input, key }: Attempt) => postDecision(caseId, input, key),
-    onSuccess: (result, { input }) => {
-      saveReviewer(input.reviewer)
+    onSuccess: (result) => {
       toast.success(`${caseId} saved in the back office as ${result.status}.`)
       queryClient.invalidateQueries({ queryKey: ['queue'] })
       queryClient.invalidateQueries({ queryKey: ['case', caseId] })
@@ -280,16 +251,9 @@ function DecisionForm(props: { caseId: string; onDone: () => void; reviewers: Re
       noValidate
     >
       <h3 className="font-medium">Decision</h3>
-      <Field label="Your name" id="reviewer" error={errors.reviewer?.message}>
-        <NativeSelect id="reviewer" className="w-full" {...form.register('reviewer')}>
-          <NativeSelectOption value="">Pick your name</NativeSelectOption>
-          {props.reviewers.map((r) => (
-            <NativeSelectOption key={r.id} value={r.id}>
-              {r.id} (shift {r.shift})
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-      </Field>
+      <p className="text-sm text-muted-foreground">
+        Deciding as <span className="font-medium text-foreground">{props.reviewer}</span>
+      </p>
       <Field label="Decision" id="decision" error={errors.decision?.message}>
         <NativeSelect id="decision" className="w-full" defaultValue="" {...form.register('decision')}>
           <NativeSelectOption value="">Pick a decision</NativeSelectOption>

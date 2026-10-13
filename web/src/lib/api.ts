@@ -1,3 +1,4 @@
+import { authHeader, clearSession, type Session } from './auth'
 import { errorMessage, type DecisionInput } from './decision'
 
 /** One row of GET /api/queue. No name, document number or birth date. */
@@ -33,11 +34,17 @@ export type CaseDetail = {
   otherAttempts: { caseId: string; attempt: number; status: string; createdAt: string | null; flags: string[] }[]
 }
 
-export type Reviewer = { id: string; team: string; shift: string }
 export type ReasonCode = { code: string; label: string }
 
+async function send(url: string, init?: RequestInit): Promise<Response> {
+  const response = await fetch(url, { ...init, headers: { ...init?.headers, ...authHeader() } })
+  // Token missing or expired: back to the login screen.
+  if (response.status === 401) clearSession()
+  return response
+}
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init)
+  const response = await send(url, init)
   if (!response.ok) {
     const body = await response.json().catch(() => null)
     throw new ApiError(errorMessage(body, response.status), response.status)
@@ -47,7 +54,6 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
 export const fetchQueue = () => request<QueueItem[]>('/api/queue')
 export const fetchCase = (caseId: string) => request<CaseDetail>(`/api/cases/${encodeURIComponent(caseId)}`)
-export const fetchReviewers = () => request<Reviewer[]>('/api/reviewers')
 export const fetchReasonCodes = () => request<ReasonCode[]>('/api/reason-codes')
 
 /** Thrown for a non-OK answer; status lets the screen react (e.g. 409 = already decided). */
@@ -67,17 +73,25 @@ export const postDecision = (caseId: string, decision: DecisionInput, idempotenc
     body: JSON.stringify(decision),
   })
 
-/** The case to work on next, or null when every pending case is taken (204). */
-export async function takeNext(reviewer: string): Promise<string | null> {
-  const response = await fetch('/api/claims/next', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ reviewer }),
-  })
+/** The case to work on next for the logged-in reviewer, or null when every pending case is taken (204). */
+export async function takeNext(): Promise<string | null> {
+  const response = await send('/api/claims/next', { method: 'POST' })
   if (response.status === 204) return null
   if (!response.ok) {
     const body = await response.json().catch(() => null)
     throw new ApiError(errorMessage(body, response.status), response.status)
   }
   return ((await response.json()) as { caseId: string }).caseId
+}
+
+/** Wrong name or password comes back as an ApiError with a plain message. */
+export async function login(username: string, password: string): Promise<Session> {
+  const response = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  })
+  const body = await response.json().catch(() => null)
+  if (!response.ok) throw new ApiError(errorMessage(body, response.status), response.status)
+  return body as Session
 }

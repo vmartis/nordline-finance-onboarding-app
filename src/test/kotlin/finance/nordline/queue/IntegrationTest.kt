@@ -20,6 +20,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer
         "app.clock.now=2026-10-14T08:00:00Z",
         "app.case-api.key=test-case-api-key",
         "app.reference-dir=data",
+        "app.auth.jwt-secret=test-jwt-secret-that-is-at-least-32-bytes-long",
     ],
 )
 @AutoConfigureMockMvc

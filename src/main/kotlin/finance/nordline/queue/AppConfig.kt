@@ -11,7 +11,16 @@ import java.time.Instant
 import java.time.ZoneOffset
 
 @ConfigurationProperties("app")
-data class AppProperties(val ingest: Ingest, val clock: ClockSettings, val caseApi: CaseApi, val referenceDir: String) {
+data class AppProperties(
+    val ingest: Ingest,
+    val clock: ClockSettings,
+    val caseApi: CaseApi,
+    val referenceDir: String,
+    val auth: Auth = Auth(),
+) {
+    /** HMAC key for signing login tokens (from the environment) and how long a token lasts (one shift). */
+    data class Auth(val jwtSecret: String = "", val tokenHours: Long = 8)
+
     /** The legacy back-office Case API. The key never leaves the server. */
     data class CaseApi(val url: String, val key: String)
 

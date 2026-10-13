@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { attemptFor, decisionSchema, errorMessage, rememberedReviewer, type DecisionInput } from './decision'
+import { attemptFor, decisionSchema, errorMessage, type DecisionInput } from './decision'
 
 const valid = { reviewer: 'j.sebo', decision: 'APPROVE', reasonCode: 'VERIFIED_MANUAL', comment: 'Face matches' }
 
@@ -28,19 +28,6 @@ describe('errorMessage', () => {
 
   it('falls back to a plain sentence', () => {
     expect(errorMessage(null, 500)).toBe('Something went wrong (500). Nothing was saved. Try again.')
-  })
-})
-
-describe('rememberedReviewer', () => {
-  const reviewers = [{ id: 'j.sebo' }, { id: 't.weber' }]
-
-  it('keeps the remembered name when it is still on the list', () => {
-    expect(rememberedReviewer('t.weber', reviewers)).toBe('t.weber')
-  })
-
-  it('drops a remembered name that is not on the list, so nobody saves under a hidden name', () => {
-    expect(rememberedReviewer('someone.else', reviewers)).toBe('')
-    expect(rememberedReviewer(null, reviewers)).toBe('')
   })
 })
 

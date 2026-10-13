@@ -21,6 +21,8 @@ app:
     url: ${CASE_API_URL:http://case-api:9000}
     key: ${CASE_API_KEY:}
   reference-dir: ${REFERENCE_DIR:/reference}
+  auth:
+    jwt-secret: ${JWT_SECRET:}
 logging:
   level:
     # Its warnings quote rejected request values, which can be personal data. Clients still get the 400.

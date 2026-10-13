@@ -25,11 +25,6 @@ export function errorMessage(body: unknown, status: number): string {
     : `Something went wrong (${status}). Nothing was saved. Try again.`
 }
 
-/** The remembered reviewer, but only if still on the list; otherwise the reviewer must pick again. */
-export function rememberedReviewer(saved: string | null, reviewers: { id: string }[]): string {
-  return saved !== null && reviewers.some((r) => r.id === saved) ? saved : ''
-}
-
 /** One save attempt: the decision and its idempotency key. */
 export type Attempt = { input: DecisionInput; key: string }
 
