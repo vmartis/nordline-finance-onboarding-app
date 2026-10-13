@@ -6,10 +6,43 @@
   <title>Morning Queue</title>
   <style>
     body { font-family: system-ui, sans-serif; margin: 2rem; color: #1a1a1a; }
+    table { border-collapse: collapse; }
+    th, td { text-align: left; padding: .35rem .8rem; border-bottom: 1px solid #ddd; }
+    th { font-weight: 600; }
+    .muted { color: #666; }
   </style>
 </head>
 <body>
   <h1>Morning Queue</h1>
-  <p>Onboarding review queue. Cases will appear here.</p>
+  <p id="summary" class="muted">Loading…</p>
+  <table id="queue" hidden>
+    <thead><tr><th>Time left</th><th>Case</th><th>Document</th><th>Flags</th><th>Attempt</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <script>
+    function timeLeft(minutes) {
+      if (minutes === null) return "unknown (data problem)";
+      const m = Math.abs(minutes), text = Math.floor(m / 60) + " h " + String(m % 60).padStart(2, "0") + " min";
+      return minutes < 0 ? "overdue " + text : text;
+    }
+    function cell(row, text) { row.insertCell().textContent = text; }
+
+    fetch("/api/queue")
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(items => {
+        document.getElementById("summary").textContent = items.length + " pending cases, most urgent first";
+        const body = document.querySelector("#queue tbody");
+        for (const it of items) {
+          const row = body.insertRow();
+          cell(row, timeLeft(it.minutesLeft));
+          cell(row, it.caseId);
+          cell(row, it.documentType ?? "");
+          cell(row, it.flags.join(", "));
+          cell(row, it.attempt);
+        }
+        document.getElementById("queue").hidden = items.length === 0;
+      })
+      .catch(() => { document.getElementById("summary").textContent = "Could not load the queue. Reload the page."; });
+  </script>
 </body>
 </html>

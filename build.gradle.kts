@@ -18,6 +18,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
+    implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("org.flywaydb:flyway-database-postgresql")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     runtimeOnly("org.postgresql:postgresql")
@@ -31,7 +33,7 @@ dependencies {
 }
 
 kotlin {
-    compilerOptions { freeCompilerArgs.addAll("-Xjsr305=strict") }
+    compilerOptions { freeCompilerArgs.addAll("-Xjsr305=strict", "-Xemit-jvm-type-annotations") }
 }
 
 tasks.withType<Test> { useJUnitPlatform() }

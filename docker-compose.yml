@@ -36,6 +36,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/queue
       SPRING_DATASOURCE_USERNAME: queue
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-local-dev-db-password-change-me}
+      INGEST_API_KEY: ${INGEST_API_KEY:-local-dev-ingest-key-change-me}
+      APP_NOW: ${APP_NOW:-2026-10-14T08:00:00Z}
     depends_on:
       db:
         condition: service_healthy

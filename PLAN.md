@@ -1,6 +1,6 @@
 # Plan
 
-**Now:** S1 done (19:52) · **Next:** S2 main workflow · **Elapsed:** 0:46 (19:52; start 19:07, live by 20:37, end 22:07)
+**Now:** S2a done (20:01) · **Next:** S2b decide a case · **Elapsed:** 0:54 (20:01; start 19:07, live by 20:37, end 22:07)
 
 User: the reviewer. Stack: Kotlin + Spring Boot, PostgreSQL, one plain HTML/JS page. Tests: `./gradlew test`.
 Each slice: tests first for logic → `./deploy.sh` → check on http://localhost:8080 → tick ✓ → commit.
@@ -8,7 +8,8 @@ Each slice: tests first for logic → `./deploy.sh` → check on http://localhos
 | # | Slice (what the user can do after it) | Done when (check) | Min | ✓ |
 |---|---|---|---|---|
 | S1 | **Skeleton.** Open http://localhost:8080 and see the app's page | `./deploy.sh` passes; `/` answers 200; Postgres up with Flyway tables; no published DB port; secrets from env | 15 | ✓ |
-| S2 | **Main workflow, ugly.** See pending cases sorted by time left to SLA, open one, decide with a reason code; the decision lands in the Case API | Import script loads `data/cases.json` via `POST /api/ingest/cases`; one case decided in the browser shows as decided in `GET /cases/{id}` on the Case API; test for SLA ordering | 25 | |
+| S2a | **See the queue.** Pending cases listed, most urgent first (time left to SLA) | Import script loads `data/cases.json` via `POST /api/ingest/cases` (API key) and prints accepted/updated; `/` lists pending cases by time left; test for SLA ordering | 20 | ✓ |
+| S2b | **Decide a case.** Open a case, pick your name, decision and reason code; the decision lands in the Case API | One case decided in the browser shows as decided in `GET /cases/{id}` on the Case API; test with fake Case API for the happy path | 20 | |
 | S3 | **Trustworthy data.** Bad export records are visible as "data problem", not silently wrong | Tests per rule: duplicate ID (first wins), `14.10.2026` dates, missing/invalid scores; import prints accepted/updated/problems; re-run changes nothing | 15 | |
 | S4 | **Safe decision.** Saving never creates two decisions and never loses one; every decision has a reason | Tests with fake Case API: 503 then OK = one decision (same idempotency key); 409 → case refreshed + message; 422 shown; empty reason/comment rejected; decision log row only after API confirms | 20 | |
 | S5 | **Take next.** Pick your name, press "Take next", get the most urgent case nobody else has; overdue and < 1 h marked | Test: two parallel claims never get the same case; simulated clock setting changes "time left" | 15 | |

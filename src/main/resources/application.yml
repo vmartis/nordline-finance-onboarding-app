@@ -8,3 +8,12 @@ server:
   error:
     include-message: never
     include-stacktrace: never
+app:
+  ingest:
+    api-key: ${INGEST_API_KEY:}
+  clock:
+    now: ${APP_NOW:2026-10-14T08:00:00Z}
+logging:
+  level:
+    # Its warnings quote rejected request values, which can be personal data. Clients still get the 400.
+    org.springframework.web.servlet.mvc.support.DefaultHandlerExceptionResolver: ERROR
