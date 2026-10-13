@@ -1,0 +1,22 @@
+# Environment services. Add your own app service(s) below "# --- your services ---".
+services:
+  case-api:
+    build: ./services/case-api
+    environment:
+      CASE_API_KEY: ${CASE_API_KEY:-local-dev-key-change-me}
+      DATA_DIR: /data
+      STATE_FILE: /state/decisions.json
+    volumes:
+      - ./data:/data:ro
+      - case-api-state:/state
+    ports:
+      - "127.0.0.1:9000:9000"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:9000/health')"]
+      interval: 5s
+      retries: 10
+  # --- your services ---
+  # Your app must listen on port 8080 and can reach the legacy API at http://case-api:9000
+
+volumes:
+  case-api-state:

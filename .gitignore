@@ -1,0 +1,8 @@
+.idea/
+Claude outputs/
+# Customer identity data: stays on this machine, never in git
+data/cases.json
+__pycache__/
+*.pyc
+.pytest_cache/
+.env

@@ -1,0 +1,26 @@
+[
+ {
+  "code": "DOC_INVALID",
+  "label": "Document invalid, expired or tampered"
+ },
+ {
+  "code": "FACE_MISMATCH",
+  "label": "Selfie does not match document"
+ },
+ {
+  "code": "PRESENTATION_ATTACK",
+  "label": "Suspected spoof (photo, screen, mask)"
+ },
+ {
+  "code": "POOR_QUALITY_RECAPTURE",
+  "label": "Ask customer to retake photos"
+ },
+ {
+  "code": "VERIFIED_MANUAL",
+  "label": "Verified by reviewer"
+ },
+ {
+  "code": "ESCALATE_COMPLIANCE",
+  "label": "Escalate to compliance"
+ }
+]
