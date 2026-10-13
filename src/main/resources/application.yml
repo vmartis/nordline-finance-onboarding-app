@@ -1,0 +1,10 @@
+# Database URL, user and password come from the environment
+# (SPRING_DATASOURCE_URL / _USERNAME / _PASSWORD), never from this file.
+spring:
+  application:
+    name: morning-queue
+server:
+  port: 8080
+  error:
+    include-message: never
+    include-stacktrace: never

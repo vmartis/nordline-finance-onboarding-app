@@ -17,6 +17,31 @@ services:
       retries: 10
   # --- your services ---
   # Your app must listen on port 8080 and can reach the legacy API at http://case-api:9000
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: queue
+      POSTGRES_USER: queue
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-local-dev-db-password-change-me}
+    volumes:
+      - queue-db:/var/lib/postgresql/data
+    # No published port: the database is reachable only inside this compose network.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U queue -d queue"]
+      interval: 3s
+      retries: 20
+  app:
+    build: .
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/queue
+      SPRING_DATASOURCE_USERNAME: queue
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-local-dev-db-password-change-me}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:8080"
 
 volumes:
   case-api-state:
+  queue-db:

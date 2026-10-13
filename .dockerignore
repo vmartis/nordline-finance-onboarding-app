@@ -1,0 +1,7 @@
+# Only the build files and sources go into the image. Never customer data.
+*
+!gradlew
+!gradle/
+!settings.gradle.kts
+!build.gradle.kts
+!src/

@@ -9,3 +9,6 @@
 | 19:26 | `data/cases.json` not committed to git | Commit the whole environment | Identity documents of customers must not land in repository history | Claude |
 | 19:31 | Kotlin + Spring Boot, Spring Data JDBC, Flyway, RestClient; tests with JUnit, Testcontainers, WireMock | Python + FastAPI (chosen at 19:26) | Human's own default when the stack is open; Java 21, Kotlin, Gradle are installed; Spring has built-ins for validation, DB access and HTTP | Human |
 | 19:34 | MVP serves only the reviewer; Lucia's team view moves after the MVP, with helpdesk | Reviewer + Lucia in the MVP | One primary user and one main workflow; more time for the reviewer flow | Human |
+| 19:52 | DB password from `DB_PASSWORD` env, with a local-only default like the given `CASE_API_KEY` | Required `.env` file; hard-coded | `./deploy.sh` works out of the box on this machine; a shared host must set it (switch to `:?` then) | Claude |
+| 19:52 | Spring Boot 4.1.1, Kotlin 2.4.20, Postgres 17; Gradle project at repo root, `.dockerignore` allowlist keeps `data/` out of the image | Separate `app/` folder | Plain `./gradlew test` from the root; allowlist makes leaking customer data into the image impossible by default | Claude |
+| 19:52 | Applied Flyway migrations are never edited; changes go in a new migration | Edit V1 | Editing V1 broke startup (checksum mismatch) during S1 | Claude |
